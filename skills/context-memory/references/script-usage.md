@@ -7,6 +7,9 @@ Use skill-local scripts for predictable, non-interactive execution.
 - `scripts/memory_tool.py`
 - `scripts/memory_workflow.py`
 
+These are the canonical executable interfaces for this skill.
+They call `memory_service` directly and do not depend on root-level wrapper scripts.
+
 ## Output conventions
 
 - machine-readable data on stdout (JSON)

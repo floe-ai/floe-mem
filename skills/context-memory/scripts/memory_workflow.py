@@ -3,17 +3,13 @@ from __future__ import annotations
 
 import argparse
 import json
-import subprocess
 import sys
 from pathlib import Path
 
+REPO_ROOT = Path(__file__).resolve().parents[3]
+sys.path.insert(0, str(REPO_ROOT))
 
-def run_memory(entry: Path, args: list[str]) -> dict:
-    cmd = [sys.executable, str(entry), *args]
-    proc = subprocess.run(cmd, text=True, capture_output=True)
-    if proc.returncode != 0:
-        raise RuntimeError(proc.stderr.strip() or proc.stdout.strip() or "memory command failed")
-    return json.loads(proc.stdout)
+from memory_service import MemoryService, ServiceConfig
 
 
 def main() -> int:
@@ -27,90 +23,44 @@ def main() -> int:
     ap.add_argument("--register", action="append", default=[], help="paths to register before indexing")
     args = ap.parse_args()
 
-    skill_dir = Path(__file__).resolve().parents[1]
-    repo_base = (skill_dir / ".." / "..").resolve()
-    entry = repo_base / "scripts" / "memory.py"
-    if not entry.exists():
-        print("error: scripts/memory.py not found", file=sys.stderr)
-        return 2
+    svc = MemoryService(
+        ServiceConfig(
+            repo_id=args.repo_id,
+            repo_root=Path(args.repo_root).resolve(),
+            db_path=Path(args.db).resolve(),
+        )
+    )
 
     try:
         for locator in args.register:
-            run_memory(
-                entry,
-                [
-                    "--repo-id",
-                    args.repo_id,
-                    "--repo-root",
-                    args.repo_root,
-                    "--db",
-                    args.db,
-                    "register_document",
-                    "--locator",
-                    locator,
-                    "--kind",
-                    "doc",
-                ],
+            svc.register_document(
+                locator=locator,
+                kind="doc",
             )
 
-        idx = run_memory(
-            entry,
-            [
-                "--repo-id",
-                args.repo_id,
-                "--repo-root",
-                args.repo_root,
-                "--db",
-                args.db,
-                "index",
-                "--scope",
-                "delta",
-                "--reason",
-                "workflow_refresh",
-            ],
+        idx = svc.index(
+            scope="delta",
+            reason="workflow_refresh",
         )
 
-        search = run_memory(
-            entry,
-            [
-                "--repo-id",
-                args.repo_id,
-                "--repo-root",
-                args.repo_root,
-                "--db",
-                args.db,
-                "search",
-                "--query",
-                args.objective,
-                "--limit",
-                "20",
-            ],
+        search = svc.search(
+            query=args.objective,
+            limit=20,
         )
 
-        bundle_args = [
-            "--repo-id",
-            args.repo_id,
-            "--repo-root",
-            args.repo_root,
-            "--db",
-            args.db,
-            "build_context_bundle",
-            "--objective",
-            args.objective,
-            "--profile",
-            args.profile,
-        ]
-        if args.token_budget is not None:
-            bundle_args.extend(["--token-budget", str(args.token_budget)])
-        bundle = run_memory(entry, bundle_args)
+        bundle = svc.build_context_bundle(
+            objective=args.objective,
+            profile=args.profile,
+            token_budget=args.token_budget,
+        )
 
         print(
             json.dumps(
                 {
                     "ok": True,
-                    "index": idx.get("result"),
-                    "search_top": search.get("result", {}).get("results", [])[:5],
-                    "bundle": bundle.get("result"),
+                    "index": idx,
+                    "search_top": search.get("results", [])[:5],
+                    "bundle": bundle,
                 },
                 ensure_ascii=False,
                 indent=2,
@@ -120,6 +70,8 @@ def main() -> int:
     except Exception as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
+    finally:
+        svc.close()
 
 
 if __name__ == "__main__":

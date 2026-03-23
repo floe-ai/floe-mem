@@ -24,10 +24,10 @@ Canonical project docs stay where they already live in the repo.
 - `search`
 - `build_context_bundle`
 
-Single entrypoint:
+Canonical entrypoint (skill-local):
 
 ```bash
-python3 scripts/memory.py --help
+python3 skills/context-memory/scripts/memory_tool.py --help
 ```
 
 ## Quick start
@@ -35,7 +35,7 @@ python3 scripts/memory.py --help
 1. Register a canonical document.
 
 ```bash
-python3 scripts/memory.py register_document \
+python3 skills/context-memory/scripts/memory_tool.py register_document \
   --repo-id demo \
   --repo-root . \
   --locator docs/architecture.md \
@@ -46,7 +46,7 @@ python3 scripts/memory.py register_document \
 2. Write a memory-owned summary record.
 
 ```bash
-python3 scripts/memory.py upsert_memory_record \
+python3 skills/context-memory/scripts/memory_tool.py upsert_memory_record \
   --repo-id demo \
   --repo-root . \
   --record-class summary \
@@ -58,7 +58,7 @@ python3 scripts/memory.py upsert_memory_record \
 3. Link records/documents explicitly.
 
 ```bash
-python3 scripts/memory.py link_records \
+python3 skills/context-memory/scripts/memory_tool.py link_records \
   --repo-id demo \
   --repo-root . \
   --from-ref '{"type":"memory_record","id":"rec_a"}' \
@@ -69,13 +69,13 @@ python3 scripts/memory.py link_records \
 4. Refresh derived state incrementally.
 
 ```bash
-python3 scripts/memory.py index --repo-id demo --repo-root . --scope delta
+python3 skills/context-memory/scripts/memory_tool.py index --repo-id demo --repo-root . --scope delta
 ```
 
 5. Run deterministic search.
 
 ```bash
-python3 scripts/memory.py search \
+python3 skills/context-memory/scripts/memory_tool.py search \
   --repo-id demo \
   --repo-root . \
   --query "profile settings layout"
@@ -84,7 +84,19 @@ python3 scripts/memory.py search \
 6. Build bounded context bundle.
 
 ```bash
-python3 scripts/memory.py build_context_bundle \
+python3 skills/context-memory/scripts/memory_tool.py build_context_bundle \
+  --repo-id demo \
+  --repo-root . \
+  --objective "implement profile settings grouping" \
+  --profile implementer
+```
+
+## Workflow helper
+
+For a single deterministic loop (optional):
+
+```bash
+python3 skills/context-memory/scripts/memory_workflow.py \
   --repo-id demo \
   --repo-root . \
   --objective "implement profile settings grouping" \

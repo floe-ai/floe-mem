@@ -33,7 +33,7 @@ Relationship edges must be created by `memory.link_records`, not `memory.upsert_
 
 Prefer skill-local scripts for deterministic execution and concise, parseable output:
 
-- `scripts/memory_tool.py`: thin wrapper around the repo memory CLI.
+- `scripts/memory_tool.py`: canonical direct entrypoint for memory tools.
 - `scripts/memory_workflow.py`: opinionated non-interactive workflow helper.
 
 ## Progressive disclosure

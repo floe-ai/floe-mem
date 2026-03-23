@@ -73,8 +73,8 @@ def parser() -> argparse.ArgumentParser:
     return ap
 
 
-def run() -> int:
-    args = parser().parse_args()
+def run(argv: list[str] | None = None) -> int:
+    args = parser().parse_args(argv)
     svc = MemoryService(
         ServiceConfig(
             repo_id=args.repo_id,
