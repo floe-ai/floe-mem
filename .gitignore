@@ -1,0 +1,15 @@
+# Python
+__pycache__/
+*.py[cod]
+
+# Local memory runtime artifacts
+.ai/
+*.db
+*.sqlite
+*.sqlite3
+
+# Windows metadata from copied files
+*:Zone.Identifier
+
+# Local env/noise
+.DS_Store
