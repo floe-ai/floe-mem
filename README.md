@@ -3,6 +3,24 @@
 Standalone, database-backed memory continuity for coding agents.
 Canonical project docs stay in-place; memory stores derived retrieval state.
 
+## Prerequisites
+
+1. Install `uv`.
+On macOS/Linux:
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+On Windows (PowerShell):
+```powershell
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+```
+2. Restart your shell or ensure `uv` is on `PATH`.
+3. Verify:
+```bash
+uv --version
+```
+4. For `uvx --from <git-url> ...`, ensure `git` is installed.
+
 ## One-command install
 
 Use `uvx` from a Git URL or local path:
@@ -25,6 +43,11 @@ From this repository:
 
 ```bash
 uv run install-memory-skills
+```
+
+Exact script path form from this repo:
+```bash
+uv run tools/memory_service/install_skills.py
 ```
 
 Non-interactive example:

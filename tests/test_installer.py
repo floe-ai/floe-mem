@@ -57,6 +57,20 @@ class InstallerTests(unittest.TestCase):
             )
             self.assertEqual(help_proc.returncode, 0, msg=help_proc.stderr)
 
+    def test_script_path_entrypoint_help(self) -> None:
+        proc = subprocess.run(
+            [
+                "uv",
+                "run",
+                str(self.repo_root / "tools" / "memory_service" / "install_skills.py"),
+                "--help",
+            ],
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(proc.returncode, 0, msg=proc.stderr)
+        self.assertIn("Install/sync context-memory skill", proc.stdout)
+
     def test_non_interactive_symlink_install(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             project_root = Path(tmp)
