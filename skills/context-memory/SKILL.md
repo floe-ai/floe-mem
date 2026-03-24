@@ -1,3 +1,8 @@
+---
+name: context-memory
+description: Provide repo-local memory continuity and targeted retrieval for non-trivial coding tasks.
+---
+
 # Context Memory Skill
 
 ## Purpose
