@@ -2,13 +2,12 @@
 from __future__ import annotations
 
 import argparse
+import json
+import subprocess
 import sys
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parents[3]
-sys.path.insert(0, str(REPO_ROOT))
-
-from memory_service.cli import run as memory_cli_run
+INSTALL_META_FILENAME = ".memory_skill_install.json"
 
 
 def normalize_global_flags(
@@ -43,6 +42,28 @@ def normalize_global_flags(
     return remaining, repo_id, repo_root, db, enable_vector
 
 
+def _resolve_repo_root() -> Path:
+    script_path = Path(__file__).resolve()
+    skill_dir = script_path.parents[1]
+    meta_path = skill_dir / INSTALL_META_FILENAME
+    if meta_path.exists():
+        try:
+            data = json.loads(meta_path.read_text(encoding="utf-8"))
+            source = data.get("source_repo_root")
+            if source:
+                candidate = Path(str(source)).expanduser().resolve()
+                if (candidate / "tools" / "memory_service").exists():
+                    return candidate
+        except Exception:
+            pass
+
+    for parent in script_path.parents:
+        if (parent / "tools" / "memory_service").exists() and (parent / "pyproject.toml").exists():
+            return parent
+
+    raise RuntimeError("unable to locate source repo root for memory-skill-runner")
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(
         description="Skill-local entrypoint for repo memory tools",
@@ -63,20 +84,27 @@ def main() -> int:
         enable_vector=bool(args.enable_vector),
     )
 
-    cli_argv = [
+    runner_argv = [
+        "uv",
+        "run",
+        "--directory",
+        str(_resolve_repo_root()),
+        "memory-skill-runner",
         "--repo-id",
         repo_id,
         "--repo-root",
         repo_root,
         "--db",
         db,
+        args.tool,
     ]
     if enable_vector:
-        cli_argv.append("--enable-vector")
-    cli_argv.append(args.tool)
+        runner_argv.append("--enable-vector")
     if normalized_tool_args:
-        cli_argv.extend(normalized_tool_args)
-    return memory_cli_run(cli_argv)
+        runner_argv.extend(normalized_tool_args)
+
+    proc = subprocess.run(runner_argv)
+    return int(proc.returncode)
 
 
 if __name__ == "__main__":

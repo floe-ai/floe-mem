@@ -1,6 +1,7 @@
 # Script Usage
 
 Use skill-local scripts for predictable, non-interactive execution.
+Run through `uv` only.
 
 ## Scripts
 
@@ -8,7 +9,14 @@ Use skill-local scripts for predictable, non-interactive execution.
 - `scripts/memory_workflow.py`
 
 These are the canonical executable interfaces for this skill.
-They call `memory_service` directly and do not depend on root-level wrapper scripts.
+They delegate to `uv run memory-skill-runner ...` so copied and symlinked skill installs remain stable.
+
+## Install flow
+
+1. Install/sync the skill with:
+`uvx --from <git-url-or-local-path> install-memory-skills`
+2. Pick clients, scope, and mode in the guided prompts.
+3. Execute scripts from the installed skill location.
 
 ## Output conventions
 

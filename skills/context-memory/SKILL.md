@@ -36,6 +36,9 @@ Prefer skill-local scripts for deterministic execution and concise, parseable ou
 - `scripts/memory_tool.py`: canonical direct entrypoint for memory tools.
 - `scripts/memory_workflow.py`: opinionated non-interactive workflow helper.
 
+Install/sync this skill with:
+- `uvx --from <git-url-or-local-path> install-memory-skills`
+
 ## Progressive disclosure
 
 Only load additional details as needed:

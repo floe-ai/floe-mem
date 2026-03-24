@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from memory_service import MemoryService, ServiceConfig
+from tools.memory_service import MemoryService, ServiceConfig
 
 
 class MemoryServiceTests(unittest.TestCase):
