@@ -19,14 +19,19 @@ powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | ie
 ```bash
 uv --version
 ```
-4. For `uvx --from <git-url> ...`, ensure `git` is installed.
+4. For `uvx --from ...`, ensure `git` is installed.
 
 ## One-command install
 
-Use `uvx` from a Git URL or local path:
+Use `uvx` from GitHub:
 
 ```bash
-uvx --from <git-url-or-local-path> install-memory-skills
+uvx --from https://github.com/floe-ai/floe-mem.git install-memory-skills
+```
+
+Local-path equivalent:
+```bash
+uvx --from . install-memory-skills
 ```
 
 The guided installer prompts for:
