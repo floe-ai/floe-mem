@@ -25,7 +25,13 @@ def _package_root() -> Path:
 
 
 def _canonical_skill_dir() -> Path:
-    return _package_root() / "skills" / SKILL_NAME
+    repo_candidate = _package_root() / "skills" / SKILL_NAME
+    if repo_candidate.exists():
+        return repo_candidate
+    packaged_candidate = Path(__file__).resolve().parent / "assets" / "skills" / SKILL_NAME
+    if packaged_candidate.exists():
+        return packaged_candidate
+    return repo_candidate
 
 
 def _project_root(path_value: str | None) -> Path:
