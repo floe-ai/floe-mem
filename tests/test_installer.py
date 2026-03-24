@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import tempfile
 import unittest
@@ -26,8 +27,6 @@ class InstallerTests(unittest.TestCase):
                     "codex",
                     "--scope",
                     "project",
-                    "--mode",
-                    "copy",
                     "--project-root",
                     str(project_root),
                     "--yes",
@@ -44,7 +43,8 @@ class InstallerTests(unittest.TestCase):
 
             skill_dir = project_root / ".agents" / "skills" / "context-memory"
             self.assertTrue(skill_dir.exists())
-            self.assertTrue((skill_dir / ".memory_skill_install.json").exists())
+            self.assertFalse(skill_dir.is_symlink())
+            self.assertTrue((project_root / "tools" / "memory_service" / "runner.py").exists())
 
             help_proc = subprocess.run(
                 [
@@ -71,7 +71,7 @@ class InstallerTests(unittest.TestCase):
         self.assertEqual(proc.returncode, 0, msg=proc.stderr)
         self.assertIn("Install/sync context-memory skill", proc.stdout)
 
-    def test_non_interactive_symlink_install(self) -> None:
+    def test_non_interactive_global_copy_install(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             project_root = Path(tmp)
             proc = subprocess.run(
@@ -84,9 +84,7 @@ class InstallerTests(unittest.TestCase):
                     "--target",
                     "claude",
                     "--scope",
-                    "project",
-                    "--mode",
-                    "auto",
+                    "global",
                     "--project-root",
                     str(project_root),
                     "--yes",
@@ -94,19 +92,21 @@ class InstallerTests(unittest.TestCase):
                 ],
                 capture_output=True,
                 text=True,
+                env={**os.environ, "HOME": str(project_root)},
             )
             self.assertEqual(proc.returncode, 0, msg=proc.stderr)
             payload = json.loads(proc.stdout)
             self.assertTrue(payload["ok"])
             skill_dir = project_root / ".claude" / "skills" / "context-memory"
-            self.assertTrue(skill_dir.exists() or skill_dir.is_symlink())
-            self.assertIn(payload["results"][0]["mode_used"], {"symlink", "copy"})
+            self.assertTrue(skill_dir.exists())
+            self.assertFalse(skill_dir.is_symlink())
+            self.assertTrue((project_root / ".claude" / "tools" / "memory_service" / "runner.py").exists())
 
     def test_interactive_prompt_flow(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             project_root = Path(tmp)
-            # 1=Codex, 1=project, 2=copy, y=confirm
-            guided_input = "1\n1\n2\ny\n"
+            # 1=Codex, 1=project, y=confirm
+            guided_input = "1\n1\ny\n"
             proc = subprocess.run(
                 [
                     "uv",

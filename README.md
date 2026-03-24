@@ -32,10 +32,10 @@ uvx --from <git-url-or-local-path> install-memory-skills
 The guided installer prompts for:
 - target clients (`Codex`, `Copilot`, `Claude`)
 - scope (`project` or `global`)
-- mode (`symlink` recommended, or `copy`)
+- confirmation of resolved install paths
 
-Symlink is recommended because it keeps one source of truth and simplifies updates.
-Copy is supported for portability when symlinks are unavailable.
+Install behavior is snapshot-copy only.
+It copies skill files and `tools/memory_service` into the selected target root.
 
 ## Local development install
 
@@ -56,7 +56,6 @@ Non-interactive example:
 uv run install-memory-skills \
   --target codex,copilot,claude \
   --scope project \
-  --mode auto \
   --force \
   --yes \
   --non-interactive
@@ -88,6 +87,7 @@ Tool surface:
 - `tools/memory_service` is internal tooling, not app runtime.
 - `skills/context-memory` is the authored skill source.
 - Installed client skill directories are generated/synced artifacts.
+- Runtime DB is local state under `.ai/` and is intentionally gitignored.
 
 ## Tests
 

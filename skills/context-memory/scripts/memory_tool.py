@@ -2,12 +2,8 @@
 from __future__ import annotations
 
 import argparse
-import json
 import subprocess
-import sys
 from pathlib import Path
-
-INSTALL_META_FILENAME = ".memory_skill_install.json"
 
 
 def normalize_global_flags(
@@ -44,24 +40,11 @@ def normalize_global_flags(
 
 def _resolve_repo_root() -> Path:
     script_path = Path(__file__).resolve()
-    skill_dir = script_path.parents[1]
-    meta_path = skill_dir / INSTALL_META_FILENAME
-    if meta_path.exists():
-        try:
-            data = json.loads(meta_path.read_text(encoding="utf-8"))
-            source = data.get("source_repo_root")
-            if source:
-                candidate = Path(str(source)).expanduser().resolve()
-                if (candidate / "tools" / "memory_service").exists():
-                    return candidate
-        except Exception:
-            pass
-
     for parent in script_path.parents:
-        if (parent / "tools" / "memory_service").exists() and (parent / "pyproject.toml").exists():
+        if (parent / "tools" / "memory_service").exists():
             return parent
 
-    raise RuntimeError("unable to locate source repo root for memory-skill-runner")
+    raise RuntimeError("unable to locate repo root containing tools/memory_service")
 
 
 def main() -> int:
@@ -89,7 +72,9 @@ def main() -> int:
         "run",
         "--directory",
         str(_resolve_repo_root()),
-        "memory-skill-runner",
+        "python",
+        "-m",
+        "tools.memory_service.runner",
         "--repo-id",
         repo_id,
         "--repo-root",

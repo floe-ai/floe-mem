@@ -9,7 +9,7 @@ Run through `uv` only.
 - `scripts/memory_workflow.py`
 
 These are the canonical executable interfaces for this skill.
-They delegate to `uv run memory-skill-runner ...` so copied and symlinked skill installs remain stable.
+They delegate to `uv run python -m tools.memory_service.runner ...` so snapshot-copied installs remain stable.
 
 ## Install flow
 

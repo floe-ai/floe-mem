@@ -2,19 +2,15 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import shutil
 import sys
 from dataclasses import dataclass
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 SKILL_NAME = "context-memory"
-INSTALL_META_FILENAME = ".memory_skill_install.json"
 CLIENTS = ("codex", "copilot", "claude")
 SCOPES = ("project", "global")
-MODES = ("auto", "symlink", "copy")
 
 
 @dataclass(frozen=True)
@@ -22,10 +18,6 @@ class InstallTarget:
     client: str
     scope: str
     target_dir: Path
-
-
-def _now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
 
 
 def _package_root() -> Path:
@@ -63,6 +55,20 @@ def _target_dir(client: str, scope: str, project_root: Path) -> Path:
         if client == "claude":
             return home / ".claude" / "skills" / SKILL_NAME
     raise ValueError(f"unsupported client/scope: {client}/{scope}")
+
+
+def _tooling_root_for_target(target: InstallTarget, project_root: Path) -> Path:
+    if target.scope == "project":
+        return project_root
+    if target.scope == "global":
+        home = _global_home()
+        if target.client == "codex":
+            return home / ".agents"
+        if target.client == "copilot":
+            return home / ".copilot"
+        if target.client == "claude":
+            return home / ".claude"
+    raise ValueError(f"unsupported client/scope for tooling root: {target.client}/{target.scope}")
 
 
 def _print_err(message: str) -> None:
@@ -111,20 +117,6 @@ def _interactive_select_scope() -> str:
     raise ValueError(f"unknown scope selection '{raw}'")
 
 
-def _interactive_select_mode() -> str:
-    _print_err("Install mode:")
-    _print_err("  1) symlink (recommended)")
-    _print_err("  2) copy")
-    _print_err("Symlink keeps one source of truth and makes updates easier.")
-    _print_err("Copy is more portable but can drift from source.")
-    raw = _read_stdin().lower()
-    if raw in ("", "1", "symlink"):
-        return "symlink"
-    if raw in ("2", "copy"):
-        return "copy"
-    raise ValueError(f"unknown mode selection '{raw}'")
-
-
 def _interactive_confirm() -> bool:
     _print_err("Apply this installation plan? [y/N]")
     raw = _read_stdin().lower()
@@ -140,27 +132,13 @@ def _remove_existing(path: Path) -> None:
     shutil.rmtree(path)
 
 
-def _write_install_metadata(target_dir: Path, source_repo_root: Path, client: str, scope: str, mode_used: str) -> None:
-    meta = {
-        "skill_name": SKILL_NAME,
-        "source_repo_root": str(source_repo_root),
-        "installed_at": _now_iso(),
-        "client": client,
-        "scope": scope,
-        "install_mode_used": mode_used,
-    }
-    (target_dir / INSTALL_META_FILENAME).write_text(
-        json.dumps(meta, ensure_ascii=False, indent=2),
-        encoding="utf-8",
-    )
-
-
 def _install_one(
     source_skill_dir: Path,
     source_repo_root: Path,
     target: InstallTarget,
-    mode: str,
     force: bool,
+    project_root: Path,
+    tooling_actions: dict[str, str],
 ) -> dict[str, Any]:
     target_dir = target.target_dir
     target_dir.parent.mkdir(parents=True, exist_ok=True)
@@ -170,38 +148,65 @@ def _install_one(
             raise FileExistsError(f"target already exists: {target_dir}")
         _remove_existing(target_dir)
 
-    mode_used = mode
-    if mode == "symlink":
-        os.symlink(str(source_skill_dir), str(target_dir), target_is_directory=True)
-    elif mode == "copy":
-        shutil.copytree(source_skill_dir, target_dir)
-    elif mode == "auto":
-        try:
-            os.symlink(str(source_skill_dir), str(target_dir), target_is_directory=True)
-            mode_used = "symlink"
-        except OSError:
-            shutil.copytree(source_skill_dir, target_dir)
-            mode_used = "copy"
-    else:
-        raise ValueError(f"invalid mode '{mode}'")
-
-    if mode_used == "copy":
-        _write_install_metadata(
-            target_dir=target_dir,
-            source_repo_root=source_repo_root,
-            client=target.client,
-            scope=target.scope,
-            mode_used=mode_used,
-        )
+    shutil.copytree(source_skill_dir, target_dir)
+    engine_dir, engine_action = _ensure_tooling_snapshot(
+        source_repo_root=source_repo_root,
+        target=target,
+        project_root=project_root,
+        force=force,
+        tooling_actions=tooling_actions,
+    )
 
     return {
         "client": target.client,
         "scope": target.scope,
         "target_dir": str(target_dir),
-        "mode_requested": mode,
-        "mode_used": mode_used,
+        "mode_requested": "copy",
+        "mode_used": "copy",
+        "tooling_dir": str(engine_dir),
+        "tooling_action": engine_action,
         "status": "installed",
     }
+
+
+def _copy_file(src: Path, dest: Path) -> None:
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(src, dest)
+
+
+def _ensure_tooling_snapshot(
+    source_repo_root: Path,
+    target: InstallTarget,
+    project_root: Path,
+    force: bool,
+    tooling_actions: dict[str, str],
+) -> tuple[Path, str]:
+    tooling_root = _tooling_root_for_target(target=target, project_root=project_root)
+    tools_pkg_dir = tooling_root / "tools"
+    tools_pkg_dir.mkdir(parents=True, exist_ok=True)
+    source_tools_init = source_repo_root / "tools" / "__init__.py"
+    target_tools_init = tools_pkg_dir / "__init__.py"
+    if not target_tools_init.exists() or force:
+        _copy_file(source_tools_init, target_tools_init)
+
+    source_engine_dir = source_repo_root / "tools" / "memory_service"
+    target_engine_dir = tools_pkg_dir / "memory_service"
+    key = str(target_engine_dir)
+    if key in tooling_actions:
+        return target_engine_dir, "reused_in_run"
+
+    if target_engine_dir.exists():
+        if force:
+            _remove_existing(target_engine_dir)
+            shutil.copytree(source_engine_dir, target_engine_dir)
+            tooling_actions[key] = "replaced"
+            return target_engine_dir, "replaced"
+        tooling_actions[key] = "kept_existing"
+        return target_engine_dir, "kept_existing"
+
+    shutil.copytree(source_engine_dir, target_engine_dir)
+    tooling_actions[key] = "created"
+    return target_engine_dir, "created"
 
 
 def _parse_targets(raw_target: str | None) -> list[str]:
@@ -220,20 +225,21 @@ def _build_targets(clients: list[str], scope: str, project_root: Path) -> list[I
     return [InstallTarget(client=c, scope=scope, target_dir=_target_dir(c, scope, project_root)) for c in clients]
 
 
-def _emit_plan(source_skill_dir: Path, targets: list[InstallTarget], mode: str, force: bool) -> None:
+def _emit_plan(source_skill_dir: Path, targets: list[InstallTarget], project_root: Path, force: bool) -> None:
     _print_err(f"Source skill: {source_skill_dir}")
-    _print_err(f"Install mode: {mode}")
+    _print_err("Install mode: copy (snapshot)")
     _print_err(f"Force replace: {'yes' if force else 'no'}")
     _print_err("Targets:")
     for target in targets:
+        tooling_root = _tooling_root_for_target(target=target, project_root=project_root)
         _print_err(f"  - {target.client}/{target.scope}: {target.target_dir}")
+        _print_err(f"    tooling snapshot: {tooling_root / 'tools' / 'memory_service'}")
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Install/sync context-memory skill for Codex, Copilot, and Claude")
     parser.add_argument("--target", help="comma-separated: codex,copilot,claude")
     parser.add_argument("--scope", choices=SCOPES)
-    parser.add_argument("--mode", choices=MODES)
     parser.add_argument("--project-root", help="project root for project-scoped installs (default: cwd)")
     parser.add_argument("--force", action="store_true")
     parser.add_argument("--yes", action="store_true", help="skip confirmation")
@@ -258,24 +264,26 @@ def main(argv: list[str] | None = None) -> int:
     try:
         clients = _parse_targets(args.target)
         scope = args.scope
-        mode = args.mode
-        interactive = not args.non_interactive and not (clients and scope and mode)
+        interactive = not args.non_interactive
 
         if interactive:
             clients = clients or _interactive_select_clients()
             scope = scope or _interactive_select_scope()
-            mode = mode or _interactive_select_mode()
         else:
             clients = clients or list(CLIENTS)
             scope = scope or "project"
-            mode = mode or "auto"
 
-        if scope is None or mode is None:
-            raise ValueError("scope and mode are required")
+        if scope is None:
+            raise ValueError("scope is required")
 
         project_root = _project_root(args.project_root)
         targets = _build_targets(clients, scope, project_root)
-        _emit_plan(source_skill_dir=source_skill_dir, targets=targets, mode=mode, force=bool(args.force))
+        _emit_plan(
+            source_skill_dir=source_skill_dir,
+            targets=targets,
+            project_root=project_root,
+            force=bool(args.force),
+        )
 
         if interactive and not args.yes:
             if not _interactive_confirm():
@@ -284,14 +292,16 @@ def main(argv: list[str] | None = None) -> int:
 
         results: list[dict[str, Any]] = []
         failures: list[dict[str, Any]] = []
+        tooling_actions: dict[str, str] = {}
         for target in targets:
             try:
                 result = _install_one(
                     source_skill_dir=source_skill_dir,
                     source_repo_root=source_repo_root,
                     target=target,
-                    mode=mode,
                     force=bool(args.force),
+                    project_root=project_root,
+                    tooling_actions=tooling_actions,
                 )
                 results.append(result)
             except Exception as exc:
@@ -300,7 +310,7 @@ def main(argv: list[str] | None = None) -> int:
                         "client": target.client,
                         "scope": target.scope,
                         "target_dir": str(target.target_dir),
-                        "mode_requested": mode,
+                        "mode_requested": "copy",
                         "status": "failed",
                         "error": str(exc),
                     }
