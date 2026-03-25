@@ -156,23 +156,35 @@ def _interactive_select_scope() -> str:
     raise ValueError(f"unknown scope selection '{raw}'")
 
 
-def _interactive_confirm(targets: list[InstallTarget], source_skill_dir: Path, force: bool) -> bool:
-    lines = [f"  Source: {source_skill_dir}", f"  Mode: copy (snapshot)", f"  Force: {'yes' if force else 'no'}"]
+def _short_path(path: Path) -> str:
+    """Return path relative to home if inside it, otherwise absolute."""
+    try:
+        return f"~/{path.relative_to(Path.home())}"
+    except ValueError:
+        return str(path)
+
+
+def _interactive_confirm(targets: list[InstallTarget], scope: str, force: bool) -> bool:
+    _print_err("")
+    _print_err("  context-memory skill will be installed for:")
+    _print_err("")
     for target in targets:
-        lines.append(f"  → {target.client}/{target.scope}: {target.target_dir}")
-    detail = "\n".join(lines)
-    _print_err(f"\nInstall plan:\n{detail}\n")
+        _print_err(f"    {target.client.capitalize():10s}  →  {_short_path(target.target_dir)}")
+    if force:
+        _print_err("")
+        _print_err("  Existing installations will be replaced (--force).")
+    _print_err("")
 
     if _is_tty():
         return inquirer.confirm(
-            message="Apply this installation plan?",
-            default=False,
+            message="Proceed with installation?",
+            default=True,
         ).execute()
 
     # Fallback for non-TTY
-    _print_err("Apply this installation plan? [y/N]")
+    _print_err("Proceed with installation? [Y/n]")
     raw = _read_stdin().lower()
-    return raw in ("y", "yes")
+    return raw in ("", "y", "yes")
 
 
 def _remove_existing(path: Path) -> None:
@@ -277,17 +289,6 @@ def _build_targets(clients: list[str], scope: str, project_root: Path) -> list[I
     return [InstallTarget(client=c, scope=scope, target_dir=_target_dir(c, scope, project_root)) for c in clients]
 
 
-def _emit_plan(source_skill_dir: Path, targets: list[InstallTarget], project_root: Path, force: bool) -> None:
-    _print_err(f"Source skill: {source_skill_dir}")
-    _print_err("Install mode: copy (snapshot)")
-    _print_err(f"Force replace: {'yes' if force else 'no'}")
-    _print_err("Targets:")
-    for target in targets:
-        tooling_root = _tooling_root_for_target(target=target, project_root=project_root)
-        _print_err(f"  - {target.client}/{target.scope}: {target.target_dir}")
-        _print_err(f"    tooling snapshot: {tooling_root / 'tools' / 'memory_service'}")
-
-
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Install/sync context-memory skill for Codex, Copilot, and Claude")
     parser.add_argument("--target", help="comma-separated: codex,copilot,claude")
@@ -330,15 +331,9 @@ def main(argv: list[str] | None = None) -> int:
 
         project_root = _project_root(args.project_root)
         targets = _build_targets(clients, scope, project_root)
-        _emit_plan(
-            source_skill_dir=source_skill_dir,
-            targets=targets,
-            project_root=project_root,
-            force=bool(args.force),
-        )
 
         if interactive and not args.yes:
-            if not _interactive_confirm(targets=targets, source_skill_dir=source_skill_dir, force=bool(args.force)):
+            if not _interactive_confirm(targets=targets, scope=scope, force=bool(args.force)):
                 print(json.dumps({"ok": False, "cancelled": True}, ensure_ascii=False, indent=2))
                 return 1
 
