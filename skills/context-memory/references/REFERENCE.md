@@ -1,7 +1,129 @@
 # Context Memory — Operation Reference
 
+This document covers the full API and the simplified commands.
+
+## Simplified Commands
+
+These are the recommended commands for everyday use. They wrap the full API
+with sensible defaults so you don't need to construct JSON payloads.
+
+All commands use `uv run scripts/memory.py` from the project root.
+
+### save
+
+Save a memory record with flat arguments.
+
+```bash
+uv run scripts/memory.py save "<content>" [--type <type>] [--tags <comma-separated>] [--title <title>] [--agent <name>] [--task <description>]
+```
+
+| Argument | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `content` | yes | — | The memory content (positional) |
+| `--type` | no | `learning` | One of: `decision`, `pattern`, `issue`, `learning`, `preference`, `constraint` |
+| `--tags` | no | — | Comma-separated tags, e.g. `auth,api,jwt` |
+| `--title` | no | auto-derived | Short title (first 80 chars of content if omitted) |
+| `--agent` | no | `unknown` | Agent identifier |
+| `--task` | no | — | Current task description |
+| `--record-id` | no | auto-generated | Update an existing record by ID |
+
+**Example:**
+
+```bash
+uv run scripts/memory.py save "Chose JWT with refresh tokens over session cookies" --type decision --tags auth,api
+```
+
+**Output:**
+
+```json
+{"ok": true, "result": {"saved": "rec_abc123", "type": "decision", "title": "Chose JWT with refresh tokens over session cookies"}}
+```
+
+### recall
+
+Search memory for relevant context.
+
+```bash
+uv run scripts/memory.py recall "<query>" [--limit <n>]
+```
+
+| Argument | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `query` | yes | — | What to search for (positional) |
+| `--limit` | no | `5` | Maximum results |
+
+**Example:**
+
+```bash
+uv run scripts/memory.py recall "authentication approach"
+```
+
+**Output:**
+
+```json
+{"ok": true, "result": {"query": "authentication approach", "count": 2, "memories": [{"id": "rec_abc123", "type": "memory_record", "tier": "validated_recent_history", "snippet": "Chose JWT with...", "score": 54.0}]}}
+```
+
+### status
+
+Show an overview of what's in memory.
+
+```bash
+uv run scripts/memory.py status
+```
+
+**Output:**
+
+```json
+{"ok": true, "result": {"documents": 15, "memories": 4, "chunks": 120, "recent": [{"id": "rec_abc123", "class": "summary", "title": "Chose JWT...", "type": "decision", "updated": "2025-01-15T10:30:00+00:00"}]}}
+```
+
+### remember
+
+Register and index one or more files in a single step.
+
+```bash
+uv run scripts/memory.py remember <file> [file...] [--kind <type>]
+```
+
+| Argument | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `files` | yes | — | One or more file paths (positional) |
+| `--kind` | no | `doc` | Document kind |
+
+**Example:**
+
+```bash
+uv run scripts/memory.py remember docs/architecture.md src/auth/config.py
+```
+
+### context
+
+Build a context bundle for a task objective.
+
+```bash
+uv run scripts/memory.py context "<objective>" [--profile <profile>] [--token-budget <n>]
+```
+
+| Argument | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `objective` | yes | — | What you are trying to accomplish (positional) |
+| `--profile` | no | `implementer` | One of: `generic`, `implementer`, `reviewer`, `planner`, `foreman` |
+| `--token-budget` | no | profile default | Override token budget |
+
+**Example:**
+
+```bash
+uv run scripts/memory.py context "implement user login flow"
+```
+
+---
+
+## Full API Reference
+
 Complete argument reference for all memory operations.
-All commands are invoked via `python scripts/memory_tool.py <command> [args]`.
+All commands are invoked via `uv run scripts/memory_tool.py <command> [args]`
+or `uv run scripts/memory.py` (which delegates to the same backend).
 
 Global flags (apply to all commands):
 

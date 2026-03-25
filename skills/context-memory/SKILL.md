@@ -10,7 +10,7 @@ license: MIT
 compatibility: Requires uv and Python >=3.10. Works with Codex, Copilot, and Claude.
 metadata:
   author: floe-ai
-  version: "0.1.0"
+  version: "0.2.0"
 ---
 
 # Context Memory Skill
@@ -38,15 +38,13 @@ simple renames, or formatting changes where no prior context could matter.
 Before reading any project files, search for context relevant to your task:
 
 ```bash
-python scripts/memory_tool.py search --query "<your task description>" --limit 5
+uv run scripts/memory.py recall "your task description"
 ```
 
 Or build a full context bundle:
 
 ```bash
-python scripts/memory_tool.py build_context_bundle \
-  --objective "<your task description>" \
-  --profile implementer
+uv run scripts/memory.py context "your task description"
 ```
 
 Use what you find to inform your approach. Only then proceed to explore files.
@@ -58,11 +56,7 @@ Proceed with the task, informed by the memory context you retrieved.
 If you discover important documents during your work, register them:
 
 ```bash
-python scripts/memory_tool.py register_document \
-  --locator <relative-path> \
-  --kind <documentation|source|config|spec>
-
-python scripts/memory_tool.py index --scope delta
+uv run scripts/memory.py remember docs/architecture.md src/config.py
 ```
 
 ### Step 3: Write back memories BEFORE finishing
@@ -71,29 +65,23 @@ This is not optional. Before you consider your work complete, write back:
 
 **What to record — ask yourself these questions:**
 
-- Did I make a decision? Record it as a summary.
-- Did I discover how something works? Record it as a summary.
-- Did I find a gotcha or edge case? Record it as a summary.
-- Did I establish a pattern or convention? Record it as a summary.
+- Did I make a decision? → `--type decision`
+- Did I discover how something works? → `--type learning`
+- Did I find a gotcha or edge case? → `--type issue`
+- Did I establish a pattern or convention? → `--type pattern`
 - Did I try something that didn't work? Record it so the next agent doesn't repeat it.
 
 **How to record it:**
 
 ```bash
-python scripts/memory_tool.py upsert_memory_record \
-  --record-class summary \
-  --durability-class durable_derived \
-  --payload '{"title": "<concise title>", "summary": "<what happened, what was decided, and why>", "status": "accepted"}' \
-  --provenance '{"source_refs": [], "agent": "<agent-name>", "task": "<task-description>"}'
+uv run scripts/memory.py save "Chose JWT with refresh tokens over session cookies. API is stateless across regions." --type decision --tags auth,api
 ```
 
-**Link related records when relevant:**
+Multiple memories? Save each one:
 
 ```bash
-python scripts/memory_tool.py link_records \
-  --from-ref '{"type": "record", "id": "<new-record-id>"}' \
-  --to-ref '{"type": "document", "id": "<related-doc-id>"}' \
-  --edge-type derived_from
+uv run scripts/memory.py save "FTS5 requires UNINDEXED for metadata columns to enable WHERE filtering" --type learning --tags sqlite,search
+uv run scripts/memory.py save "text_cache was bloating the DB - content should be read from disk via locator" --type issue --tags performance,storage
 ```
 
 ### What good memory records look like
@@ -107,23 +95,35 @@ require a shared store. Refresh tokens rotate on each use with a 7-day expiry."*
 Good records capture the **decision**, the **reasoning**, and the **constraints**.
 Bad records state what happened without explaining why.
 
-## Scripts
+## Quick reference
 
-- `scripts/memory_tool.py` — direct memory commands (register, upsert, link, index, search, bundle)
-- `scripts/memory_workflow.py` — compact search-and-bundle flow for a given objective
+| Command | What it does |
+|---------|-------------|
+| `uv run scripts/memory.py recall "<query>"` | Search memory for relevant context |
+| `uv run scripts/memory.py context "<objective>"` | Build a context bundle for a task |
+| `uv run scripts/memory.py save "<text>" --type <type> --tags <tags>` | Save a memory |
+| `uv run scripts/memory.py remember <file> [file...]` | Register and index file(s) |
+| `uv run scripts/memory.py status` | Show memory overview |
 
-## Available Operations
+### Memory types
 
-| Operation | Script invocation |
-|-----------|-------------------|
-| Search memory | `python scripts/memory_tool.py search --query <text>` |
-| Build a context bundle | `python scripts/memory_tool.py build_context_bundle --objective <text>` |
-| Create/update a memory record | `python scripts/memory_tool.py upsert_memory_record --record-class <class> --payload <json> --durability-class <durability> --provenance <json>` |
-| Register a document | `python scripts/memory_tool.py register_document --locator <path> --kind <type>` |
-| Index documents and records | `python scripts/memory_tool.py index --scope delta` |
-| Link two records | `python scripts/memory_tool.py link_records --from-ref <json> --to-ref <json> --edge-type <type>` |
+| Type | Use when |
+|------|----------|
+| `decision` | You chose between alternatives |
+| `learning` | You discovered how something works |
+| `pattern` | You established a convention or approach |
+| `issue` | You found a bug, gotcha, or edge case |
+| `preference` | You noted a project/team preference |
+| `constraint` | You identified a technical limitation |
 
-See [references/REFERENCE.md](references/REFERENCE.md) for full argument details, types, and output formats.
+## Advanced usage
+
+For power users who need the full API (nested JSON payloads, custom provenance,
+record linking, custom durability classes), see
+[references/REFERENCE.md](references/REFERENCE.md).
+
+The simplified commands above use the `summary` record class with `durable_derived`
+durability by default. The full API supports all record classes and durability levels.
 
 ## Guidelines
 

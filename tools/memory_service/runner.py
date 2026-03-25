@@ -17,6 +17,8 @@ TOOL_COMMANDS = {
     "build_context_bundle",
 }
 
+SIMPLE_COMMANDS = {"save", "recall", "status", "remember", "context"}
+
 
 def _workflow(argv: list[str]) -> int:
     ap = argparse.ArgumentParser(description="Deterministic memory workflow helper")
@@ -77,9 +79,9 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     first = argv[0]
-    if first in TOOL_COMMANDS:
+    if first in TOOL_COMMANDS or first in SIMPLE_COMMANDS:
         return cli_run(argv)
-    if any(token in TOOL_COMMANDS for token in argv):
+    if any(token in TOOL_COMMANDS or token in SIMPLE_COMMANDS for token in argv):
         return cli_run(argv)
     if first == "workflow":
         return _workflow(argv[1:])
