@@ -49,16 +49,17 @@ class InstallerTests(unittest.TestCase):
             help_proc = subprocess.run(
                 [
                     "python3",
-                    str(skill_dir / "scripts" / "memory_tool.py"),
-                    "--help",
+                    str(skill_dir / "scripts" / "memory.py"),
                 ],
                 capture_output=True,
                 text=True,
             )
-            self.assertEqual(help_proc.returncode, 0, msg=help_proc.stderr)
-            self.assertTrue(
-                (skill_dir / "scripts" / "memory.py").exists(),
-                "simplified memory.py should be installed",
+            self.assertEqual(help_proc.returncode, 2)
+            out = json.loads(help_proc.stdout)
+            self.assertFalse(out["ok"])
+            self.assertFalse(
+                (skill_dir / "scripts" / "memory_tool.py").exists(),
+                "legacy memory_tool.py should not be installed",
             )
 
     def test_script_path_entrypoint_help(self) -> None:

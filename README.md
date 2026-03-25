@@ -74,7 +74,7 @@ uv run install-memory-skills \
 
 ## Memory commands
 
-Installed skill uses simplified commands via `uv run scripts/memory.py`:
+Installed skill uses `uv run scripts/memory.py` from the project root:
 
 | Command | What it does |
 |---------|-------------|
@@ -86,9 +86,7 @@ Installed skill uses simplified commands via `uv run scripts/memory.py`:
 
 Memory types: `decision`, `pattern`, `issue`, `learning`, `preference`, `constraint`.
 
-Full API is available via `scripts/memory_tool.py` for advanced use cases
-(custom record classes, provenance, linking). See the skill's
-`references/REFERENCE.md` for full documentation.
+See the installed skill's `references/REFERENCE.md` for full argument details.
 
 ## Runtime model
 
