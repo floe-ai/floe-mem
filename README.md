@@ -10,6 +10,10 @@ Install [Bun](https://bun.sh):
 curl -fsSL https://bun.sh/install | bash
 ```
 
+```iex
+powershell -c "irm bun.sh/install.ps1 | iex"
+```
+
 ## One-command install
 
 ```bash
