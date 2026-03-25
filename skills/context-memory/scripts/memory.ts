@@ -3,12 +3,12 @@
  * Self-contained memory service for AI coding agents.
  * Zero external dependencies — uses bun:sqlite (built-in).
  *
- * Usage:
- *   bun run scripts/memory.ts save "We chose JWT for auth" --type decision --tags auth,api
- *   bun run scripts/memory.ts recall "authentication"
- *   bun run scripts/memory.ts status
- *   bun run scripts/memory.ts remember docs/architecture.md
- *   bun run scripts/memory.ts context "implement user login"
+ * Usage (run from the skill directory — path to project root is auto-detected):
+ *   bun run memory.ts save "We chose JWT for auth" --type decision --tags auth,api
+ *   bun run memory.ts recall "authentication"
+ *   bun run memory.ts status
+ *   bun run memory.ts remember docs/architecture.md
+ *   bun run memory.ts context "implement user login"
  */
 
 import { Database } from "bun:sqlite";
@@ -18,8 +18,25 @@ import { resolve, dirname, relative } from "path";
 
 // ─── Configuration ─────────────────────────────────────────────────
 
-const DB_PATH = resolve(process.cwd(), ".ai/memory/memory.db");
-const REPO_ROOT = process.cwd();
+/**
+ * Find the project root by walking up from the script's own directory until
+ * we find a .git directory. This lets agents invoke the script from the skill
+ * directory and still land the DB at the actual project root.
+ * Falls back to cwd if no .git is found (e.g. project not yet initialised).
+ */
+function findProjectRoot(): string {
+  let dir = dirname(import.meta.path);
+  for (let i = 0; i < 20; i++) {
+    if (existsSync(resolve(dir, ".git"))) return dir;
+    const parent = resolve(dir, "..");
+    if (parent === dir) break;
+    dir = parent;
+  }
+  return process.cwd();
+}
+
+const REPO_ROOT = findProjectRoot();
+const DB_PATH = resolve(REPO_ROOT, ".ai/memory/memory.db");
 const SCHEMA_VERSION = 2;
 
 // ─── Database ──────────────────────────────────────────────────────
