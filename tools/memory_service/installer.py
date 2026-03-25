@@ -8,6 +8,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from InquirerPy import inquirer
+
 SKILL_NAME = "context-memory"
 CLIENTS = ("codex", "copilot", "claude")
 SCOPES = ("project", "global")
@@ -81,6 +83,10 @@ def _print_err(message: str) -> None:
     print(message, file=sys.stderr)
 
 
+def _is_tty() -> bool:
+    return hasattr(sys.stdin, "isatty") and sys.stdin.isatty()
+
+
 def _read_stdin(prompt: str = "> ") -> str:
     _print_err(prompt)
     line = sys.stdin.readline()
@@ -88,6 +94,24 @@ def _read_stdin(prompt: str = "> ") -> str:
 
 
 def _interactive_select_clients() -> list[str]:
+    if _is_tty():
+        choices = [
+            {"name": "Codex", "value": "codex", "enabled": True},
+            {"name": "Copilot", "value": "copilot", "enabled": True},
+            {"name": "Claude", "value": "claude", "enabled": True},
+        ]
+        picked = inquirer.checkbox(
+            message="Select target clients:",
+            choices=choices,
+            instruction="(↑↓ move, space toggle, enter confirm)",
+            validate=lambda result: len(result) > 0,
+            invalid_message="At least one client must be selected.",
+        ).execute()
+        if not picked:
+            raise ValueError("at least one client must be selected")
+        return picked
+
+    # Fallback for non-TTY (piped input, CI, etc.)
     _print_err("Select target clients (comma-separated numbers, default: all):")
     _print_err("  1) Codex")
     _print_err("  2) Copilot")
@@ -96,22 +120,31 @@ def _interactive_select_clients() -> list[str]:
     if not raw:
         return list(CLIENTS)
     index_map = {"1": "codex", "2": "copilot", "3": "claude"}
-    picked: list[str] = []
+    picked_fallback: list[str] = []
     for token in [t.strip().lower() for t in raw.split(",") if t.strip()]:
-        if token in index_map:
-            value = index_map[token]
-        else:
-            value = token
+        value = index_map.get(token, token)
         if value not in CLIENTS:
             raise ValueError(f"unknown client selection '{token}'")
-        if value not in picked:
-            picked.append(value)
-    if not picked:
+        if value not in picked_fallback:
+            picked_fallback.append(value)
+    if not picked_fallback:
         raise ValueError("at least one client must be selected")
-    return picked
+    return picked_fallback
 
 
 def _interactive_select_scope() -> str:
+    if _is_tty():
+        scope = inquirer.select(
+            message="Install scope:",
+            choices=[
+                {"name": "project (recommended)", "value": "project"},
+                {"name": "global", "value": "global"},
+            ],
+            default="project",
+        ).execute()
+        return scope
+
+    # Fallback for non-TTY
     _print_err("Install scope:")
     _print_err("  1) project (recommended)")
     _print_err("  2) global")
@@ -123,7 +156,20 @@ def _interactive_select_scope() -> str:
     raise ValueError(f"unknown scope selection '{raw}'")
 
 
-def _interactive_confirm() -> bool:
+def _interactive_confirm(targets: list[InstallTarget], source_skill_dir: Path, force: bool) -> bool:
+    lines = [f"  Source: {source_skill_dir}", f"  Mode: copy (snapshot)", f"  Force: {'yes' if force else 'no'}"]
+    for target in targets:
+        lines.append(f"  → {target.client}/{target.scope}: {target.target_dir}")
+    detail = "\n".join(lines)
+    _print_err(f"\nInstall plan:\n{detail}\n")
+
+    if _is_tty():
+        return inquirer.confirm(
+            message="Apply this installation plan?",
+            default=False,
+        ).execute()
+
+    # Fallback for non-TTY
     _print_err("Apply this installation plan? [y/N]")
     raw = _read_stdin().lower()
     return raw in ("y", "yes")
@@ -292,7 +338,7 @@ def main(argv: list[str] | None = None) -> int:
         )
 
         if interactive and not args.yes:
-            if not _interactive_confirm():
+            if not _interactive_confirm(targets=targets, source_skill_dir=source_skill_dir, force=bool(args.force)):
                 print(json.dumps({"ok": False, "cancelled": True}, ensure_ascii=False, indent=2))
                 return 1
 

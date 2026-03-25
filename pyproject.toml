@@ -3,7 +3,9 @@ name = "memory-module"
 version = "0.1.0"
 description = "Repo-local memory service and skill installer for coding agents."
 requires-python = ">=3.10"
-dependencies = []
+dependencies = [
+    "inquirerpy>=0.3.4",
+]
 
 [project.scripts]
 install-memory-skills = "tools.memory_service.installer:main"
