@@ -86,8 +86,6 @@ Installed skill uses `uv run scripts/memory.py` from the project root:
 
 Memory types: `decision`, `pattern`, `issue`, `learning`, `preference`, `constraint`.
 
-See the installed skill's `references/REFERENCE.md` for full argument details.
-
 ## Runtime model
 
 - `tools/memory_service` is internal tooling, not app runtime.

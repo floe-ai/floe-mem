@@ -116,15 +116,6 @@ Bad records state what happened without explaining why.
 | `preference` | You noted a project/team preference |
 | `constraint` | You identified a technical limitation |
 
-## Advanced usage
-
-For power users who need the full API (nested JSON payloads, custom provenance,
-record linking, custom durability classes), see
-[references/REFERENCE.md](references/REFERENCE.md).
-
-The simplified commands above use the `summary` record class with `durable_derived`
-durability by default. The full API supports all record classes and durability levels.
-
 ## Guidelines
 
 - **Memory first, files second.** Always search before exploring the codebase.
