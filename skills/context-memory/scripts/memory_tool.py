@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import subprocess
 from pathlib import Path
 
@@ -59,37 +60,47 @@ def main() -> int:
     ap.add_argument("--enable-vector", action="store_true")
     args = ap.parse_args()
 
-    normalized_tool_args, repo_id, repo_root, db, enable_vector = normalize_global_flags(
-        tool_args=args.tool_args,
-        repo_id=args.repo_id,
-        repo_root=args.repo_root,
-        db=args.db,
-        enable_vector=bool(args.enable_vector),
-    )
+    try:
+        normalized_tool_args, repo_id, repo_root, db, enable_vector = normalize_global_flags(
+            tool_args=args.tool_args,
+            repo_id=args.repo_id,
+            repo_root=args.repo_root,
+            db=args.db,
+            enable_vector=bool(args.enable_vector),
+        )
 
-    runner_argv = [
-        "uv",
-        "run",
-        "--directory",
-        str(_resolve_repo_root()),
-        "python",
-        "-m",
-        "tools.memory_service.runner",
-        "--repo-id",
-        repo_id,
-        "--repo-root",
-        repo_root,
-        "--db",
-        db,
-        args.tool,
-    ]
-    if enable_vector:
-        runner_argv.append("--enable-vector")
-    if normalized_tool_args:
-        runner_argv.extend(normalized_tool_args)
+        runner_argv = [
+            "uv",
+            "run",
+            "--directory",
+            str(_resolve_repo_root()),
+            "python",
+            "-m",
+            "tools.memory_service.runner",
+            "--repo-id",
+            repo_id,
+            "--repo-root",
+            repo_root,
+            "--db",
+            db,
+            args.tool,
+        ]
+        if enable_vector:
+            runner_argv.append("--enable-vector")
+        if normalized_tool_args:
+            runner_argv.extend(normalized_tool_args)
 
-    proc = subprocess.run(runner_argv)
-    return int(proc.returncode)
+        proc = subprocess.run(runner_argv)
+        return int(proc.returncode)
+    except FileNotFoundError:
+        print(json.dumps({"ok": False, "error": "uv not found on PATH", "hint": "Install uv: curl -LsSf https://astral.sh/uv/install.sh | sh"}))
+        return 1
+    except RuntimeError as exc:
+        print(json.dumps({"ok": False, "error": str(exc)}))
+        return 1
+    except Exception as exc:
+        print(json.dumps({"ok": False, "error": f"unexpected error: {exc}"}))
+        return 1
 
 
 if __name__ == "__main__":

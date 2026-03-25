@@ -101,10 +101,11 @@ class MemoryService:
         document_id = doc_row["id"] if doc_row else new_id("doc")
 
         abs_path = (self.config.repo_root / locator).resolve()
-        text_cache = ""
+        file_text = ""
         if abs_path.exists() and abs_path.is_file():
-            text_cache = abs_path.read_text(encoding="utf-8", errors="ignore")
-        digest = digest_text(text_cache)
+            file_text = abs_path.read_text(encoding="utf-8", errors="ignore")
+        digest = digest_text(file_text)
+        size_bytes = len(file_text.encode("utf-8"))
         version_id = new_id("dver")
 
         with self.db.tx() as cur:
@@ -130,7 +131,7 @@ class MemoryService:
                 INSERT INTO document_versions(id, document_id, digest, commit_hash, size_bytes, text_cache, created_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
-                (version_id, document_id, digest, commit_hash, len(text_cache.encode("utf-8")), text_cache, now),
+                (version_id, document_id, digest, commit_hash, size_bytes, "", now),
             )
             cur.execute(
                 "UPDATE documents SET active_version_id=?, updated_at=? WHERE id=?",
@@ -861,15 +862,15 @@ class MemoryService:
 
     def _active_document_text(self, document_id: str) -> str:
         row = self.db.fetchone(
-            """
-            SELECT dv.text_cache AS text_cache
-            FROM documents d
-            JOIN document_versions dv ON dv.id=d.active_version_id
-            WHERE d.id=?
-            """,
+            "SELECT locator FROM documents WHERE id=?",
             (document_id,),
         )
-        return row["text_cache"] if row else ""
+        if not row:
+            return ""
+        abs_path = (self.config.repo_root / row["locator"]).resolve()
+        if abs_path.exists() and abs_path.is_file():
+            return abs_path.read_text(encoding="utf-8", errors="ignore")
+        return ""
 
     def _active_document_digest(self, document_id: str) -> str:
         row = self.db.fetchone(
