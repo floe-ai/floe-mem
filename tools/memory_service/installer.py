@@ -65,20 +65,6 @@ def _target_dir(client: str, scope: str, project_root: Path) -> Path:
     raise ValueError(f"unsupported client/scope: {client}/{scope}")
 
 
-def _tooling_root_for_target(target: InstallTarget, project_root: Path) -> Path:
-    if target.scope == "project":
-        return project_root
-    if target.scope == "global":
-        home = _global_home()
-        if target.client == "codex":
-            return home / ".agents"
-        if target.client == "copilot":
-            return home / ".copilot"
-        if target.client == "claude":
-            return home / ".claude"
-    raise ValueError(f"unsupported client/scope for tooling root: {target.client}/{target.scope}")
-
-
 def _print_err(message: str) -> None:
     print(message, file=sys.stderr)
 
@@ -213,13 +199,6 @@ def _install_one(
         _remove_existing(target_dir)
 
     shutil.copytree(source_skill_dir, target_dir)
-    engine_dir, engine_action = _ensure_tooling_snapshot(
-        source_repo_root=source_repo_root,
-        target=target,
-        project_root=project_root,
-        force=force,
-        tooling_actions=tooling_actions,
-    )
 
     return {
         "client": target.client,
@@ -227,50 +206,8 @@ def _install_one(
         "target_dir": str(target_dir),
         "mode_requested": "copy",
         "mode_used": "copy",
-        "tooling_dir": str(engine_dir),
-        "tooling_action": engine_action,
         "status": "installed",
     }
-
-
-def _copy_file(src: Path, dest: Path) -> None:
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(src, dest)
-
-
-def _ensure_tooling_snapshot(
-    source_repo_root: Path,
-    target: InstallTarget,
-    project_root: Path,
-    force: bool,
-    tooling_actions: dict[str, str],
-) -> tuple[Path, str]:
-    tooling_root = _tooling_root_for_target(target=target, project_root=project_root)
-    tools_pkg_dir = tooling_root / "tools"
-    tools_pkg_dir.mkdir(parents=True, exist_ok=True)
-    source_tools_init = source_repo_root / "tools" / "__init__.py"
-    target_tools_init = tools_pkg_dir / "__init__.py"
-    if not target_tools_init.exists() or force:
-        _copy_file(source_tools_init, target_tools_init)
-
-    source_engine_dir = source_repo_root / "tools" / "memory_service"
-    target_engine_dir = tools_pkg_dir / "memory_service"
-    key = str(target_engine_dir)
-    if key in tooling_actions:
-        return target_engine_dir, "reused_in_run"
-
-    if target_engine_dir.exists():
-        if force:
-            _remove_existing(target_engine_dir)
-            shutil.copytree(source_engine_dir, target_engine_dir, ignore=shutil.ignore_patterns("assets"))
-            tooling_actions[key] = "replaced"
-            return target_engine_dir, "replaced"
-        tooling_actions[key] = "kept_existing"
-        return target_engine_dir, "kept_existing"
-
-    shutil.copytree(source_engine_dir, target_engine_dir, ignore=shutil.ignore_patterns("assets"))
-    tooling_actions[key] = "created"
-    return target_engine_dir, "created"
 
 
 def _parse_targets(raw_target: str | None) -> list[str]:

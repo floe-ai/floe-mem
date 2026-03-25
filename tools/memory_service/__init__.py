@@ -1,3 +1,1 @@
-from .service import MemoryService, ServiceConfig
-
-__all__ = ["MemoryService", "ServiceConfig"]
+# Installer-only package — runtime memory service is in scripts/memory.ts

@@ -9,7 +9,6 @@ dependencies = [
 
 [project.scripts]
 install-memory-skills = "tools.memory_service.installer:main"
-memory-skill-runner = "tools.memory_service.runner:main"
 
 [build-system]
 requires = ["hatchling"]

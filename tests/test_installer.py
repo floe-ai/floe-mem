@@ -44,22 +44,18 @@ class InstallerTests(unittest.TestCase):
             skill_dir = project_root / ".agents" / "skills" / "context-memory"
             self.assertTrue(skill_dir.exists())
             self.assertFalse(skill_dir.is_symlink())
-            self.assertTrue((project_root / "tools" / "memory_service" / "runner.py").exists())
-
-            help_proc = subprocess.run(
-                [
-                    "python3",
-                    str(skill_dir / "scripts" / "memory.py"),
-                ],
-                capture_output=True,
-                text=True,
+            self.assertTrue(
+                (skill_dir / "scripts" / "memory.ts").exists(),
+                "memory.ts should be installed",
             )
-            self.assertEqual(help_proc.returncode, 2)
-            out = json.loads(help_proc.stdout)
-            self.assertFalse(out["ok"])
+            self.assertTrue(
+                (skill_dir / "SKILL.md").exists(),
+                "SKILL.md should be installed",
+            )
+            # tools/ should NOT be copied to the project
             self.assertFalse(
-                (skill_dir / "scripts" / "memory_tool.py").exists(),
-                "legacy memory_tool.py should not be installed",
+                (project_root / "tools" / "memory_service" / "runner.py").exists(),
+                "tooling should not be copied — memory.ts is self-contained",
             )
 
     def test_script_path_entrypoint_help(self) -> None:
@@ -105,12 +101,11 @@ class InstallerTests(unittest.TestCase):
             skill_dir = project_root / ".claude" / "skills" / "context-memory"
             self.assertTrue(skill_dir.exists())
             self.assertFalse(skill_dir.is_symlink())
-            self.assertTrue((project_root / ".claude" / "tools" / "memory_service" / "runner.py").exists())
+            self.assertTrue((skill_dir / "scripts" / "memory.ts").exists())
 
     def test_interactive_prompt_flow(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             project_root = Path(tmp)
-            # 1=Codex, 1=project, y=confirm
             guided_input = "1\n1\ny\n"
             proc = subprocess.run(
                 [
