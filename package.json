@@ -1,0 +1,18 @@
+{
+  "name": "floe-mem",
+  "version": "0.2.0",
+  "description": "Pluggable memory skill for AI coding agents",
+  "bin": {
+    "floe-mem": "scripts/install.ts"
+  },
+  "files": [
+    "scripts/",
+    "skills/"
+  ],
+  "keywords": ["ai", "agent", "memory", "skill", "codex", "copilot", "claude"],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/floe-ai/floe-mem.git"
+  }
+}

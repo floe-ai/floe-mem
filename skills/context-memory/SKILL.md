@@ -7,10 +7,10 @@ description: >
   Keywords: context, history, onboarding, prior work, session memory, project
   knowledge, decisions, summaries.
 license: MIT
-compatibility: Requires uv and Python >=3.10. Works with Codex, Copilot, and Claude.
+compatibility: Requires Bun (https://bun.sh). Works with Codex, Copilot, and Claude.
 metadata:
   author: floe-ai
-  version: "0.2.0"
+  version: "0.3.0"
 ---
 
 # Context Memory Skill
@@ -31,6 +31,14 @@ If you don't write it down, the next agent starts from zero.
 **The only exception** is trivially obvious tasks — single-line typo fixes,
 simple renames, or formatting changes where no prior context could matter.
 
+## How to invoke
+
+All commands run from the **project root**:
+
+```bash
+bun run scripts/memory.ts <command> [args]
+```
+
 ## Required workflow
 
 ### Step 1: Search memory FIRST
@@ -38,13 +46,13 @@ simple renames, or formatting changes where no prior context could matter.
 Before reading any project files, search for context relevant to your task:
 
 ```bash
-uv run scripts/memory.py recall "your task description"
+bun run scripts/memory.ts recall "your task description"
 ```
 
 Or build a full context bundle:
 
 ```bash
-uv run scripts/memory.py context "your task description"
+bun run scripts/memory.ts context "your task description"
 ```
 
 Use what you find to inform your approach. Only then proceed to explore files.
@@ -56,7 +64,7 @@ Proceed with the task, informed by the memory context you retrieved.
 If you discover important documents during your work, register them:
 
 ```bash
-uv run scripts/memory.py remember docs/architecture.md src/config.py
+bun run scripts/memory.ts remember docs/architecture.md src/config.py
 ```
 
 ### Step 3: Write back memories BEFORE finishing
@@ -74,14 +82,14 @@ This is not optional. Before you consider your work complete, write back:
 **How to record it:**
 
 ```bash
-uv run scripts/memory.py save "Chose JWT with refresh tokens over session cookies. API is stateless across regions." --type decision --tags auth,api
+bun run scripts/memory.ts save "Chose JWT with refresh tokens over session cookies. API is stateless across regions." --type decision --tags auth,api
 ```
 
 Multiple memories? Save each one:
 
 ```bash
-uv run scripts/memory.py save "FTS5 requires UNINDEXED for metadata columns to enable WHERE filtering" --type learning --tags sqlite,search
-uv run scripts/memory.py save "text_cache was bloating the DB - content should be read from disk via locator" --type issue --tags performance,storage
+bun run scripts/memory.ts save "FTS5 requires UNINDEXED for metadata columns" --type learning --tags sqlite,search
+bun run scripts/memory.ts save "text_cache was bloating the DB - read content from disk" --type issue --tags performance
 ```
 
 ### What good memory records look like
@@ -99,11 +107,11 @@ Bad records state what happened without explaining why.
 
 | Command | What it does |
 |---------|-------------|
-| `uv run scripts/memory.py recall "<query>"` | Search memory for relevant context |
-| `uv run scripts/memory.py context "<objective>"` | Build a context bundle for a task |
-| `uv run scripts/memory.py save "<text>" --type <type> --tags <tags>` | Save a memory |
-| `uv run scripts/memory.py remember <file> [file...]` | Register and index file(s) |
-| `uv run scripts/memory.py status` | Show memory overview |
+| `bun run scripts/memory.ts recall "<query>"` | Search memory for relevant context |
+| `bun run scripts/memory.ts context "<objective>"` | Build a context bundle for a task |
+| `bun run scripts/memory.ts save "<text>" --type <type> --tags <tags>` | Save a memory |
+| `bun run scripts/memory.ts remember <file> [file...]` | Register and index file(s) |
+| `bun run scripts/memory.ts status` | Show memory overview |
 
 ### Memory types
 
@@ -121,6 +129,5 @@ Bad records state what happened without explaining why.
 - **Memory first, files second.** Always search before exploring the codebase.
 - **Write before you finish.** Every task that produces knowledge should leave a memory record.
 - Keep records concise but complete — capture decisions, reasoning, and constraints.
-- Prefer targeted retrieval over broad context dumps.
 - All file references in memory are relative paths from the project root.
 - The memory database is stored at `.ai/memory/memory.db` and is gitignored.
