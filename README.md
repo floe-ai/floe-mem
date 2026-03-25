@@ -5,26 +5,15 @@ Canonical project docs stay in-place; memory stores derived retrieval state.
 
 ## Prerequisites
 
-1. Install [Bun](https://bun.sh):
+Install [Bun](https://bun.sh):
 ```bash
 curl -fsSL https://bun.sh/install | bash
-```
-2. For the installer, install [uv](https://docs.astral.sh/uv/):
-```bash
-curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
 ## One-command install
 
-Use `uvx` from GitHub:
-
 ```bash
-uvx --from https://github.com/floe-ai/floe-mem.git install-memory-skills
-```
-
-Local-path equivalent:
-```bash
-uvx --from . install-memory-skills
+bunx github:floe-ai/floe-mem
 ```
 
 The guided installer prompts for:
@@ -32,12 +21,21 @@ The guided installer prompts for:
 - scope (`project` or `global`)
 - confirmation of resolved install paths
 
-Install behavior is snapshot-copy only.
-It copies the skill directory (`SKILL.md` + `scripts/memory.ts`) into the selected targets.
+It copies `SKILL.md` + `scripts/memory.ts` into the selected targets. That's it — no other dependencies.
+
+**CLI flags (skip prompts):**
+```bash
+bunx github:floe-ai/floe-mem --target codex,copilot --scope project --yes
+```
+
+**Local install (from cloned repo):**
+```bash
+bun run scripts/install.ts --target codex --scope project --yes
+```
 
 ## Memory commands
 
-All commands run from the project root using `bun`:
+All commands run from the project root:
 
 | Command | What it does |
 |---------|-------------|
@@ -51,12 +49,12 @@ Memory types: `decision`, `pattern`, `issue`, `learning`, `preference`, `constra
 
 ## Runtime model
 
-- `scripts/memory.ts` is a self-contained script using `bun:sqlite` (zero deps).
-- The memory database is stored at `.ai/memory/memory.db` and is gitignored.
-- The installer (`tools/memory_service/`) is Python-based, invoked via `uvx`.
+- `scripts/memory.ts` is a self-contained script using `bun:sqlite` (zero external deps).
+- The memory database lives at `.ai/memory/memory.db` (gitignored).
+- The installer (`scripts/install.ts`) is also a self-contained Bun script.
 
 ## Tests
 
 ```bash
-bun test tests/memory.test.ts
+bun test
 ```
