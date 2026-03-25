@@ -12,7 +12,7 @@ class SkillScriptTests(unittest.TestCase):
     def setUpClass(cls) -> None:
         cls.repo_root = Path(__file__).resolve().parents[1]
         cls.memory_tool = cls.repo_root / "skills" / "context-memory" / "scripts" / "memory_tool.py"
-        cls.memory_workflow = cls.repo_root / "skills" / "context-memory" / "scripts" / "memory_workflow.py"
+        cls.memory_simple = cls.repo_root / "skills" / "context-memory" / "scripts" / "memory.py"
 
     def test_memory_tool_help(self) -> None:
         proc = subprocess.run(
@@ -23,14 +23,16 @@ class SkillScriptTests(unittest.TestCase):
         self.assertEqual(proc.returncode, 0)
         self.assertIn("Skill-local entrypoint", proc.stdout)
 
-    def test_memory_workflow_help(self) -> None:
+    def test_memory_simple_no_args(self) -> None:
         proc = subprocess.run(
-            ["python3", str(self.memory_workflow), "--help"],
+            ["python3", str(self.memory_simple)],
             capture_output=True,
             text=True,
         )
-        self.assertEqual(proc.returncode, 0)
-        self.assertIn("Deterministic memory workflow helper", proc.stdout)
+        self.assertEqual(proc.returncode, 2)
+        out = json.loads(proc.stdout)
+        self.assertFalse(out["ok"])
+        self.assertIn("no command provided", out["error"])
 
     def test_memory_tool_end_to_end(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

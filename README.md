@@ -74,18 +74,21 @@ uv run install-memory-skills \
 
 ## Memory commands
 
-Installed skill scripts call `uv run memory-skill-runner ...`:
+Installed skill uses simplified commands via `uv run scripts/memory.py`:
 
-- `scripts/memory_tool.py`
-- `scripts/memory_workflow.py`
+| Command | What it does |
+|---------|-------------|
+| `uv run scripts/memory.py recall "<query>"` | Search memory for relevant context |
+| `uv run scripts/memory.py context "<objective>"` | Build a context bundle for a task |
+| `uv run scripts/memory.py save "<text>" --type <type> --tags <tags>` | Save a memory |
+| `uv run scripts/memory.py remember <file> [file...]` | Register and index file(s) |
+| `uv run scripts/memory.py status` | Show memory overview |
 
-Tool surface:
-- `register_document`
-- `upsert_memory_record`
-- `link_records`
-- `index`
-- `search`
-- `build_context_bundle`
+Memory types: `decision`, `pattern`, `issue`, `learning`, `preference`, `constraint`.
+
+Full API is available via `scripts/memory_tool.py` for advanced use cases
+(custom record classes, provenance, linking). See the skill's
+`references/REFERENCE.md` for full documentation.
 
 ## Runtime model
 

@@ -155,7 +155,7 @@ not stored in the database.
 ### Example
 
 ```bash
-python scripts/memory_tool.py register_document \
+uv run scripts/memory_tool.py register_document \
   --locator docs/architecture.md \
   --kind documentation \
   --metadata '{"tags": ["architecture", "overview"]}'
@@ -211,7 +211,7 @@ decisions, summaries, and context that persists across sessions.
 ### Example
 
 ```bash
-python scripts/memory_tool.py upsert_memory_record \
+uv run scripts/memory_tool.py upsert_memory_record \
   --record-class summary \
   --durability-class durable_derived \
   --payload '{"title": "Database migration strategy", "summary": "Using Alembic for migrations. Schema changes require review.", "status": "accepted"}' \
@@ -251,7 +251,7 @@ Create a typed, weighted edge between two records or documents.
 ### Example
 
 ```bash
-python scripts/memory_tool.py link_records \
+uv run scripts/memory_tool.py link_records \
   --from-ref '{"type": "record", "id": "rec-abc123"}' \
   --to-ref '{"type": "document", "id": "doc-def456"}' \
   --edge-type derived_from \
@@ -290,10 +290,10 @@ chunks from document content (read from disk) and record payloads.
 
 ```bash
 # Index only items changed since last index
-python scripts/memory_tool.py index --scope delta
+uv run scripts/memory_tool.py index --scope delta
 
 # Full rebuild
-python scripts/memory_tool.py index --scope full --force-rebuild --reason "schema update"
+uv run scripts/memory_tool.py index --scope full --force-rebuild --reason "schema update"
 ```
 
 ### Output
@@ -336,7 +336,7 @@ exact → lineage → explicit links → code affinity → validated recent hist
 ### Example
 
 ```bash
-python scripts/memory_tool.py search \
+uv run scripts/memory_tool.py search \
   --query "authentication" \
   --profile implementer \
   --limit 5
@@ -380,7 +380,7 @@ results across tiers, respects profile budgets, and returns an auditable manifes
 ### Example
 
 ```bash
-python scripts/memory_tool.py build_context_bundle \
+uv run scripts/memory_tool.py build_context_bundle \
   --objective "implement user authentication" \
   --profile implementer \
   --token-budget 2200
@@ -412,23 +412,6 @@ python scripts/memory_tool.py build_context_bundle \
   }
 }
 ```
-
----
-
-## Workflow Script
-
-`scripts/memory_workflow.py` provides a one-shot search-and-bundle flow:
-
-```bash
-python scripts/memory_workflow.py \
-  --objective "understand caching layer" \
-  --profile reviewer \
-  --token-budget 2200 \
-  --register docs/caching.md docs/redis.md
-```
-
-This registers the specified files (if not already registered), indexes them, then
-builds a context bundle for the given objective — all in one command.
 
 ---
 

@@ -56,6 +56,10 @@ class InstallerTests(unittest.TestCase):
                 text=True,
             )
             self.assertEqual(help_proc.returncode, 0, msg=help_proc.stderr)
+            self.assertTrue(
+                (skill_dir / "scripts" / "memory.py").exists(),
+                "simplified memory.py should be installed",
+            )
 
     def test_script_path_entrypoint_help(self) -> None:
         proc = subprocess.run(
