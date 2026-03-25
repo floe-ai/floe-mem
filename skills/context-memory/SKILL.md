@@ -8,9 +8,6 @@ description: >
   knowledge, decisions, summaries.
 license: MIT
 compatibility: Requires Bun (https://bun.sh). Works with Codex, Copilot, and Claude.
-metadata:
-  author: floe-ai
-  version: "0.3.0"
 ---
 
 # Context Memory Skill
@@ -30,17 +27,6 @@ If you don't write it down, the next agent starts from zero.
 
 **The only exception** is trivially obvious tasks — single-line typo fixes,
 simple renames, or formatting changes where no prior context could matter.
-
-## How to invoke
-
-Run commands **from inside the skill directory** — the script auto-detects the project root:
-
-```bash
-cd .agents/skills/context-memory   # or .github/ or .claude/
-bun run scripts/memory.ts <command> [args]
-```
-
-The script walks up from its own location to find the nearest `.git` or `package.json`, so the memory database always lands at `<project-root>/.ai/memory/memory.db` regardless of where you run from.
 
 ## Required workflow
 
