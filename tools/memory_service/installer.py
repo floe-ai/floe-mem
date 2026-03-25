@@ -30,7 +30,7 @@ def _canonical_skill_dir() -> Path:
     repo_candidate = _package_root() / "skills" / SKILL_NAME
     if repo_candidate.exists():
         return repo_candidate
-    packaged_candidate = Path(__file__).resolve().parent / "assets" / "skills" / SKILL_NAME
+    packaged_candidate = Path(__file__).resolve().parents[1] / "bundled_skills" / SKILL_NAME
     if packaged_candidate.exists():
         return packaged_candidate
     return repo_candidate
@@ -262,13 +262,13 @@ def _ensure_tooling_snapshot(
     if target_engine_dir.exists():
         if force:
             _remove_existing(target_engine_dir)
-            shutil.copytree(source_engine_dir, target_engine_dir)
+            shutil.copytree(source_engine_dir, target_engine_dir, ignore=shutil.ignore_patterns("assets"))
             tooling_actions[key] = "replaced"
             return target_engine_dir, "replaced"
         tooling_actions[key] = "kept_existing"
         return target_engine_dir, "kept_existing"
 
-    shutil.copytree(source_engine_dir, target_engine_dir)
+    shutil.copytree(source_engine_dir, target_engine_dir, ignore=shutil.ignore_patterns("assets"))
     tooling_actions[key] = "created"
     return target_engine_dir, "created"
 
