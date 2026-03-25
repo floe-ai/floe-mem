@@ -67,10 +67,20 @@ decisions, summaries, and context that persists across sessions.
 | `--record-class` | yes | string | One of: `summary`, `context_bundle`, `repo_map_entry`, `code_affinity_record`, `provenance_record`, `chunk_record`, `ephemeral_run_note` |
 | `--payload` | yes | JSON string | Record content. Should include `title` and `body` fields |
 | `--durability-class` | yes | string | One of: `canonical_reference`, `durable_derived`, `ephemeral_run` |
-| `--provenance` | yes | JSON string | Origin metadata (agent, task, session, etc.) |
+| `--provenance` | yes | JSON string | Origin metadata. Must include `source_refs` (list of related IDs) plus any agent/task context |
 | `--record-id` | no | string | Existing record ID to update (creates new if omitted) |
 
-### Durability Classes
+### Record Class Payload Schemas
+
+| `record-class` | Required payload keys |
+|----------------|-----------------------|
+| `summary` | `title` (string), `summary` (string), `status` (string, e.g. `accepted`, `superseded`, `draft`) |
+| `ephemeral_run_note` | `note` (string) |
+| `context_bundle` | `objective` (string), `items` (array) |
+| `repo_map_entry` | `locator` (string), `inferred_kind` (string), `confidence` (float) |
+| `code_affinity_record` | `subject` (string), `affinities` (array) |
+| `provenance_record` | `target` (string), `source_ref` (string), `derivation_method` (string) |
+| `chunk_record` | `source` (string), `text` (string) — indexer-owned, not agent-authored |
 
 - **canonical_reference** — Permanent, human-validated knowledge (e.g., architecture decisions)
 - **durable_derived** — Agent-produced summaries intended to persist across sessions
@@ -82,8 +92,8 @@ decisions, summaries, and context that persists across sessions.
 python scripts/memory_tool.py upsert_memory_record \
   --record-class summary \
   --durability-class durable_derived \
-  --payload '{"title": "Database migration strategy", "body": "Using Alembic for migrations. Schema changes require review."}' \
-  --provenance '{"agent": "copilot", "task": "db-setup", "session": "2025-01-15"}'
+  --payload '{"title": "Database migration strategy", "summary": "Using Alembic for migrations. Schema changes require review.", "status": "accepted"}' \
+  --provenance '{"source_refs": ["doc-abc123"], "agent": "copilot", "task": "db-setup", "session": "2025-01-15"}'
 ```
 
 ### Output

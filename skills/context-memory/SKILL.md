@@ -80,8 +80,8 @@ Returns:
 python scripts/memory_tool.py upsert_memory_record \
   --record-class summary \
   --durability-class durable_derived \
-  --payload '{"title": "Auth decision", "body": "Chose JWT with refresh tokens over session cookies for stateless API."}' \
-  --provenance '{"agent": "copilot", "task": "auth-implementation"}'
+  --payload '{"title": "Auth decision", "summary": "Chose JWT with refresh tokens over session cookies for stateless API.", "status": "accepted"}' \
+  --provenance '{"source_refs": [], "agent": "copilot", "task": "auth-implementation"}'
 ```
 
 ### Register a document and index it

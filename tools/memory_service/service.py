@@ -223,7 +223,7 @@ class MemoryService:
             raise ValueError("ephemeral_run_note cannot be persisted as durable without explicit promotion")
         if record_class == "chunk_record" and payload.get("authored_by"):
             raise ValueError("chunk_record is indexer-owned and cannot be agent-authored")
-        if not provenance.get("source_refs"):
+        if provenance.get("source_refs") is None:
             raise ValueError("provenance.source_refs is required")
 
         self._validate_record_payload(record_class, payload)

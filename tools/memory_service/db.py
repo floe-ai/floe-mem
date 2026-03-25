@@ -186,12 +186,11 @@ class MemoryDB:
             cur.execute(
                 """
                 CREATE VIRTUAL TABLE IF NOT EXISTS fts_chunks USING fts5(
-                    repo_id,
-                    source_type,
-                    source_id,
+                    repo_id UNINDEXED,
+                    source_type UNINDEXED,
+                    source_id UNINDEXED,
                     heading,
-                    text_content,
-                    content=''
+                    text_content
                 )
                 """
             )

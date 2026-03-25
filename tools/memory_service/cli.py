@@ -140,6 +140,9 @@ def run(argv: list[str] | None = None) -> int:
 
         print(json.dumps({"ok": True, "result": out}, ensure_ascii=False, indent=2))
         return 0
+    except Exception as exc:
+        print(json.dumps({"ok": False, "error": str(exc), "command": args.cmd}, ensure_ascii=False, indent=2))
+        return 1
     finally:
         svc.close()
 
