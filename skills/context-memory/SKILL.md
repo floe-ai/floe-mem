@@ -81,6 +81,9 @@ bun run scripts/memory.ts save "FTS5 requires UNINDEXED for metadata columns" --
 bun run scripts/memory.ts save "text_cache was bloating the DB - read content from disk" --type issue --tags performance
 ```
 
+#> [!NOTE]
+> Scripts need to be run from the skills directory (this files location). If you are having trouble executing scripts, pause and ask the user.
+
 ### What good memory records look like
 
 **Good:** *"Chose JWT with refresh token rotation over session cookies. The API is
