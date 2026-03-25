@@ -1,29 +1,26 @@
 ---
 name: context-memory
-description: Provide repo-local memory continuity and targeted retrieval for non-trivial coding tasks.
+description: Use when prior project decisions, summaries, relationships, or document context would help solve a task without rereading large parts of the repo. Provides repo-local memory retrieval and write-back tools for continuity across agent sessions.
 ---
 
 # Context Memory Skill
 
-## Purpose
+Use project memory when it is useful, not by default for every task.
 
-Provide bounded, trustworthy project continuity for fresh agents using the repo-local memory service.
+Prefer it when:
 
-## Quick start
+- the task depends on prior decisions or summaries
+- you need a compact view of relevant docs or linked work
+- you want to write back a durable summary for future agents
 
-For non-trivial tasks, run this loop:
+Skip it when the task is simple enough that direct repo inspection is faster.
 
-1. Register/update relevant canonical docs with `memory.register_document`.
-2. Run opportunistic `memory.index --scope delta`.
-3. Retrieve relationship-first with `memory.search`.
-4. Build a bounded bundle with `memory.build_context_bundle`.
-5. Execute code work.
-6. Write continuity via `memory.upsert_memory_record` class `summary`.
-7. Re-run `memory.index`.
+Use the skill-local scripts for deterministic operations:
 
-## Tool surface
+- `scripts/memory_tool.py` for direct memory commands
+- `scripts/memory_workflow.py` when you want a compact search-and-bundle flow
 
-Use only:
+Available memory operations:
 
 - `memory.register_document`
 - `memory.upsert_memory_record`
@@ -32,34 +29,6 @@ Use only:
 - `memory.search`
 - `memory.build_context_bundle`
 
-Relationship edges must be created by `memory.link_records`, not `memory.upsert_memory_record`.
+Keep outputs small and relevant. Prefer targeted retrieval and concise summaries over broad context dumps.
 
-## Use scripts
-
-Prefer skill-local scripts for deterministic execution and concise, parseable output:
-
-- `scripts/memory_tool.py`: canonical direct entrypoint for memory tools.
-- `scripts/memory_workflow.py`: opinionated non-interactive workflow helper.
-
-Install/sync this skill with:
-- `uvx --from <git-url-or-local-path> install-memory-skills`
-
-## Progressive disclosure
-
-Only load additional details as needed:
-
-- `references/retrieval-order.md`: ranking tiers and precedence guardrails.
-- `references/durability-and-records.md`: record classes, durability, promotion rules.
-- `references/discovery-and-indexing.md`: generic discovery, freshness, invalidation.
-- `references/bundle-policy.md`: quotas, token budgets, stop conditions.
-- `references/script-usage.md`: script invocation patterns and troubleshooting.
-
-## Stop and escalate
-
-Escalate when:
-
-- acceptance criteria conflict with architecture evidence
-- intent remains contradictory after one deeper retrieval pass
-- repeated failed attempts suggest decomposition is wrong
-
-In those cases, write a structured blocked summary and request replanning.
+Before finishing substantial work, consider writing a concise memory record when the outcome, decision, or discovered context is likely to help a future agent.

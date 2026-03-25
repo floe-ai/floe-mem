@@ -1,2 +1,2 @@
 name: context-memory
-description: Repo-local memory continuity and targeted retrieval for coding agents.
+description: Use project memory to recover prior decisions, summaries, and linked context without rereading large parts of the repo.
