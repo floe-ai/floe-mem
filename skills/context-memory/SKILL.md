@@ -33,10 +33,21 @@ simple renames, or formatting changes where no prior context could matter.
 
 ## How to invoke
 
-All commands run from the **project root**:
+Use this skill's own directory — works regardless of your current working directory:
 
 ```bash
-bun run scripts/memory.ts <command> [args]
+SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
+bun run "$SKILL_DIR/scripts/memory.ts" <command> [args]
+```
+
+Or from the **project root** (shorter):
+
+```bash
+bun run .agents/skills/context-memory/scripts/memory.ts <command> [args]
+# Copilot users:
+bun run .github/skills/context-memory/scripts/memory.ts <command> [args]
+# Claude users:
+bun run .claude/skills/context-memory/scripts/memory.ts <command> [args]
 ```
 
 ## Required workflow
@@ -46,13 +57,13 @@ bun run scripts/memory.ts <command> [args]
 Before reading any project files, search for context relevant to your task:
 
 ```bash
-bun run scripts/memory.ts recall "your task description"
+bun run "$SKILL_DIR/scripts/memory.ts" recall "your task description"
 ```
 
 Or build a full context bundle:
 
 ```bash
-bun run scripts/memory.ts context "your task description"
+bun run "$SKILL_DIR/scripts/memory.ts" context "your task description"
 ```
 
 Use what you find to inform your approach. Only then proceed to explore files.
@@ -64,7 +75,7 @@ Proceed with the task, informed by the memory context you retrieved.
 If you discover important documents during your work, register them:
 
 ```bash
-bun run scripts/memory.ts remember docs/architecture.md src/config.py
+bun run "$SKILL_DIR/scripts/memory.ts" remember docs/architecture.md src/config.py
 ```
 
 ### Step 3: Write back memories BEFORE finishing
@@ -82,14 +93,14 @@ This is not optional. Before you consider your work complete, write back:
 **How to record it:**
 
 ```bash
-bun run scripts/memory.ts save "Chose JWT with refresh tokens over session cookies. API is stateless across regions." --type decision --tags auth,api
+bun run "$SKILL_DIR/scripts/memory.ts" save "Chose JWT with refresh tokens over session cookies. API is stateless across regions." --type decision --tags auth,api
 ```
 
 Multiple memories? Save each one:
 
 ```bash
-bun run scripts/memory.ts save "FTS5 requires UNINDEXED for metadata columns" --type learning --tags sqlite,search
-bun run scripts/memory.ts save "text_cache was bloating the DB - read content from disk" --type issue --tags performance
+bun run "$SKILL_DIR/scripts/memory.ts" save "FTS5 requires UNINDEXED for metadata columns" --type learning --tags sqlite,search
+bun run "$SKILL_DIR/scripts/memory.ts" save "text_cache was bloating the DB - read content from disk" --type issue --tags performance
 ```
 
 ### What good memory records look like
@@ -105,13 +116,21 @@ Bad records state what happened without explaining why.
 
 ## Quick reference
 
+Set `SKILL_DIR` once at the top of your session:
+```bash
+SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
+MEM="$SKILL_DIR/scripts/memory.ts"
+```
+
+Then use `$MEM` as shorthand:
+
 | Command | What it does |
 |---------|-------------|
-| `bun run scripts/memory.ts recall "<query>"` | Search memory for relevant context |
-| `bun run scripts/memory.ts context "<objective>"` | Build a context bundle for a task |
-| `bun run scripts/memory.ts save "<text>" --type <type> --tags <tags>` | Save a memory |
-| `bun run scripts/memory.ts remember <file> [file...]` | Register and index file(s) |
-| `bun run scripts/memory.ts status` | Show memory overview |
+| `bun run $MEM recall "<query>"` | Search memory for relevant context |
+| `bun run $MEM context "<objective>"` | Build a context bundle for a task |
+| `bun run $MEM save "<text>" --type <type> --tags <tags>` | Save a memory |
+| `bun run $MEM remember <file> [file...]` | Register and index file(s) |
+| `bun run $MEM status` | Show memory overview |
 
 ### Memory types
 
