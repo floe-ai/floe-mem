@@ -136,3 +136,120 @@ test("save without content returns error", () => {
   // depends on parsing — just check it doesn't crash silently
   expect(exitCode).toBeLessThanOrEqual(1);
 });
+
+// ─── Relationship commands ──────────────────────────────────────────
+
+test("link creates a relationship between two memories", () => {
+  const dbPath = join(tmpDir, ".ai", "memory", "memory.db");
+
+  const m1 = parseOutput(runMemory(["save", "decision A", "--type", "decision", "--db", dbPath], tmpDir).stdout);
+  const m2 = parseOutput(runMemory(["save", "decision B", "--type", "decision", "--db", dbPath], tmpDir).stdout);
+  const id1 = m1.result.saved;
+  const id2 = m2.result.saved;
+
+  const { stdout, exitCode } = runMemory(
+    ["link", "memory", id1, "relates_to", "memory", id2, "--db", dbPath],
+    tmpDir
+  );
+  const out = parseOutput(stdout);
+  expect(exitCode).toBe(0);
+  expect(out.ok).toBe(true);
+  expect(out.result.linked).toMatch(/^rel_/);
+  expect(out.result.updated).toBe(false);
+});
+
+test("link is idempotent — second link updates", () => {
+  const dbPath = join(tmpDir, ".ai", "memory", "memory.db");
+  const m1 = parseOutput(runMemory(["save", "A", "--db", dbPath], tmpDir).stdout).result.saved;
+  const m2 = parseOutput(runMemory(["save", "B", "--db", dbPath], tmpDir).stdout).result.saved;
+
+  runMemory(["link", "memory", m1, "relates_to", "memory", m2, "--db", dbPath], tmpDir);
+  const second = parseOutput(
+    runMemory(["link", "memory", m1, "relates_to", "memory", m2, "--weight", "0.5", "--db", dbPath], tmpDir).stdout
+  );
+  expect(second.result.updated).toBe(true);
+});
+
+test("link rejects unknown source entity", () => {
+  const dbPath = join(tmpDir, ".ai", "memory", "memory.db");
+  const m = parseOutput(runMemory(["save", "real memory", "--db", dbPath], tmpDir).stdout).result.saved;
+  const { stdout, exitCode } = runMemory(
+    ["link", "memory", "mem_doesnotexist", "relates_to", "memory", m, "--db", dbPath],
+    tmpDir
+  );
+  const out = parseOutput(stdout);
+  expect(exitCode).toBe(1);
+  expect(out.ok).toBe(false);
+  expect(out.error).toContain("not found");
+});
+
+test("links returns neighbours", () => {
+  const dbPath = join(tmpDir, ".ai", "memory", "memory.db");
+  const m1 = parseOutput(runMemory(["save", "A", "--db", dbPath], tmpDir).stdout).result.saved;
+  const m2 = parseOutput(runMemory(["save", "B", "--db", dbPath], tmpDir).stdout).result.saved;
+  runMemory(["link", "memory", m1, "derived_from", "memory", m2, "--db", dbPath], tmpDir);
+
+  const out = parseOutput(
+    runMemory(["links", "memory", m1, "--direction", "out", "--db", dbPath], tmpDir).stdout
+  );
+  expect(out.ok).toBe(true);
+  expect(out.result.count).toBe(1);
+  expect(out.result.links[0].relation).toBe("derived_from");
+  expect(out.result.links[0].dst.id).toBe(m2);
+});
+
+test("unlink removes a relationship", () => {
+  const dbPath = join(tmpDir, ".ai", "memory", "memory.db");
+  const m1 = parseOutput(runMemory(["save", "A", "--db", dbPath], tmpDir).stdout).result.saved;
+  const m2 = parseOutput(runMemory(["save", "B", "--db", dbPath], tmpDir).stdout).result.saved;
+  const relId = parseOutput(
+    runMemory(["link", "memory", m1, "relates_to", "memory", m2, "--db", dbPath], tmpDir).stdout
+  ).result.linked;
+
+  const { stdout, exitCode } = runMemory(["unlink", relId, "--db", dbPath], tmpDir);
+  const out = parseOutput(stdout);
+  expect(exitCode).toBe(0);
+  expect(out.result.unlinked).toBe(relId);
+
+  const linksOut = parseOutput(
+    runMemory(["links", "memory", m1, "--db", dbPath], tmpDir).stdout
+  );
+  expect(linksOut.result.count).toBe(0);
+});
+
+test("recall --expand-links returns linked neighbours", () => {
+  const dbPath = join(tmpDir, ".ai", "memory", "memory.db");
+  const m1 = parseOutput(runMemory(["save", "typescript bun rewrite decision", "--type", "decision", "--db", dbPath], tmpDir).stdout).result.saved;
+  const m2 = parseOutput(runMemory(["save", "unrelated other memory", "--type", "learning", "--db", dbPath], tmpDir).stdout).result.saved;
+  runMemory(["link", "memory", m1, "relates_to", "memory", m2, "--db", dbPath], tmpDir);
+
+  const out = parseOutput(
+    runMemory(["recall", "typescript bun", "--expand-links", "--db", dbPath], tmpDir).stdout
+  );
+  expect(out.ok).toBe(true);
+  // m2 should appear as a linked neighbour
+  const ids = out.result.memories.map((m: any) => m.id);
+  expect(ids).toContain(m2);
+  const neighbour = out.result.memories.find((m: any) => m.id === m2);
+  expect(neighbour.tier).toBe("linked");
+});
+
+// ─── Discovery: .ai refinement ─────────────────────────────────────
+
+test("discovery indexes .ai artefacts but skips .ai/memory", () => {
+  const dbPath = join(tmpDir, ".ai", "memory", "memory.db");
+  // Create a .ai/docs file that should be discoverable
+  mkdirSync(join(tmpDir, ".ai", "docs"), { recursive: true });
+  writeFileSync(join(tmpDir, ".ai", "docs", "notes.md"), "# Notes\n\nSome content here.");
+  // Create .ai/memory dir and a file inside that should be skipped
+  mkdirSync(join(tmpDir, ".ai", "memory"), { recursive: true });
+  writeFileSync(join(tmpDir, ".ai", "memory", "internal.txt"), "internal state");
+
+  const out = parseOutput(
+    runMemory(["remember", ".ai/docs/notes.md", "--db", dbPath], tmpDir).stdout
+  );
+  expect(out.ok).toBe(true);
+  expect(out.result.registered.length).toBe(1);
+  expect(out.result.registered[0].file).toContain("notes.md");
+});
+

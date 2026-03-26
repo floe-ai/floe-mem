@@ -43,7 +43,7 @@ function findProjectRoot(): string {
 
 const REPO_ROOT = findProjectRoot();
 const DB_PATH = resolve(REPO_ROOT, ".ai/memory/memory.db");
-const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION = 3;
 
 // ─── Database ──────────────────────────────────────────────────────
 
@@ -109,6 +109,23 @@ function initSchema(db: Database): void {
       text_content
     )
   `);
+  db.run(`
+    CREATE TABLE IF NOT EXISTS relationships (
+      id           TEXT PRIMARY KEY,
+      src_type     TEXT NOT NULL,
+      src_id       TEXT NOT NULL,
+      dst_type     TEXT NOT NULL,
+      dst_id       TEXT NOT NULL,
+      relation     TEXT NOT NULL,
+      weight       REAL NOT NULL DEFAULT 1.0,
+      metadata_json TEXT NOT NULL DEFAULT '{}',
+      created_at   TEXT NOT NULL,
+      updated_at   TEXT NOT NULL
+    )
+  `);
+  db.run(`CREATE INDEX IF NOT EXISTS idx_rel_src ON relationships (src_type, src_id)`);
+  db.run(`CREATE INDEX IF NOT EXISTS idx_rel_dst ON relationships (dst_type, dst_id)`);
+  db.run(`CREATE INDEX IF NOT EXISTS idx_rel_rel ON relationships (relation)`);
   db.run(
     `INSERT OR REPLACE INTO metadata(key, value) VALUES ('schema_version', ?)`,
     [String(SCHEMA_VERSION)]
@@ -423,7 +440,7 @@ function search(db: Database, query: string, limit: number): SearchResult[] {
 
 // ─── File Discovery ────────────────────────────────────────────────
 
-const SKIP_DIRS = new Set([".git", "node_modules", ".ai", "__pycache__", ".venv", "dist", "build"]);
+const SKIP_DIRS = new Set([".git", "node_modules", "__pycache__", ".venv", "dist", "build"]);
 const SKIP_EXTS = new Set([".png", ".jpg", ".jpeg", ".gif", ".zip", ".pdf", ".bin", ".ico", ".woff", ".woff2", ".ttf"]);
 const MAX_FILE_SIZE = 300_000;
 const MAX_DISCOVER = 200;
@@ -432,24 +449,15 @@ function discoverFiles(db: Database): number {
   let count = 0;
   const root = REPO_ROOT;
 
-  function walk(dir: string): void {
-    if (count >= MAX_DISCOVER) return;
-    let entries;
-    try {
-      entries = Bun.file(dir); // won't work, use readdirSync
-    } catch {
-      return;
-    }
-  }
-
   // Use glob for discovery
   const glob = new Bun.Glob("**/*");
   for (const path of glob.scanSync({ cwd: root, dot: false })) {
     if (count >= MAX_DISCOVER) break;
 
-    // Skip unwanted directories
+    // Skip unwanted directories and .ai/memory (internal storage)
     const parts = path.split("/");
     if (parts.some((p) => SKIP_DIRS.has(p))) continue;
+    if (path.startsWith(".ai/memory/") || path === ".ai/memory") continue;
 
     const absPath = resolve(root, path);
     try {
@@ -549,10 +557,18 @@ function cmdSave(db: Database, args: string[]): object {
 
 function cmdRecall(db: Database, args: string[]): object {
   const query = args[0];
-  if (!query) throw new Error("query is required. Usage: recall <query> [--limit <n>]");
+  if (!query) throw new Error("query is required. Usage: recall <query> [--limit <n>] [--expand-links] [--link-relations <csv>] [--link-limit <n>]");
 
   const limit = parseInt(getFlag(args, "--limit") || "5", 10);
+  const expandLinks_ = args.includes("--expand-links");
+  const linkRelations = getFlag(args, "--link-relations")?.split(",").map((s) => s.trim()) ?? null;
+  const linkLimit = parseInt(getFlag(args, "--link-limit") || "5", 10);
+
   const results = search(db, query, limit);
+  if (expandLinks_) {
+    const neighbours = expandLinks(db, results, linkRelations, linkLimit);
+    return { query, count: results.length + neighbours.length, memories: [...results, ...neighbours] };
+  }
   return { query, count: results.length, memories: results };
 }
 
@@ -649,7 +665,7 @@ function cmdRemember(db: Database, args: string[]): object {
 
 function cmdContext(db: Database, args: string[]): object {
   const objective = args[0];
-  if (!objective) throw new Error("objective is required. Usage: context <objective> [--profile <profile>]");
+  if (!objective) throw new Error("objective is required. Usage: context <objective> [--profile <profile>] [--expand-links] [--link-relations <csv>] [--link-limit <n>]");
 
   const profile = getFlag(args, "--profile") || "implementer";
   const budgetStr = getFlag(args, "--token-budget");
@@ -661,20 +677,26 @@ function cmdContext(db: Database, args: string[]): object {
     foreman: 2800,
   };
   const budget = budgetStr ? parseInt(budgetStr, 10) : budgets[profile] || 2200;
+  const expandLinks_ = args.includes("--expand-links");
+  const linkRelations = getFlag(args, "--link-relations")?.split(",").map((s) => s.trim()) ?? null;
+  const linkLimit = parseInt(getFlag(args, "--link-limit") || "5", 10);
 
   // Index everything first
   discoverFiles(db);
   indexDocuments(db);
   indexMemories(db);
 
-  // Search
-  const results = search(db, objective, 40);
+  // Search + optional one-hop expansion
+  const directResults = search(db, objective, 40);
+  const allResults = expandLinks_
+    ? [...directResults, ...expandLinks(db, directResults, linkRelations, linkLimit)]
+    : directResults;
 
   // Build bundle within token budget
   let usedTokens = 0;
   const items: object[] = [];
 
-  for (const r of results) {
+  for (const r of allResults) {
     const est = estimateTokens(r.snippet);
     if (usedTokens + est > budget) continue;
     items.push({
@@ -697,6 +719,162 @@ function cmdContext(db: Database, args: string[]): object {
   };
 }
 
+// ─── Relationships ─────────────────────────────────────────────────
+
+function resolveEntityType(db: Database, type: string, id: string): boolean {
+  if (type === "document") {
+    return !!db.query<{ id: string }, [string]>("SELECT id FROM documents WHERE id = ?").get(id);
+  }
+  if (type === "memory") {
+    return !!db.query<{ id: string }, [string]>("SELECT id FROM memories WHERE id = ?").get(id);
+  }
+  return false;
+}
+
+function cmdLink(db: Database, args: string[]): object {
+  const [srcType, srcId, relation, dstType, dstId] = args;
+  if (!srcType || !srcId || !relation || !dstType || !dstId) {
+    throw new Error(
+      "Usage: link <src_type> <src_id> <relation> <dst_type> <dst_id> [--weight <n>] [--meta <json>]"
+    );
+  }
+  const weight = parseFloat(getFlag(args, "--weight") || "1.0");
+  const metaRaw = getFlag(args, "--meta") || "{}";
+  let metadata_json = "{}";
+  try { metadata_json = JSON.stringify(JSON.parse(metaRaw)); } catch {
+    throw new Error(`--meta must be valid JSON. Got: ${metaRaw}`);
+  }
+
+  if (!resolveEntityType(db, srcType, srcId)) {
+    throw new Error(`Source entity not found: ${srcType} ${srcId}`);
+  }
+  if (!resolveEntityType(db, dstType, dstId)) {
+    throw new Error(`Destination entity not found: ${dstType} ${dstId}`);
+  }
+
+  const now = utcNow();
+  // Upsert — idempotent on the natural key
+  const existing = db.query<{ id: string }, [string, string, string, string, string]>(
+    "SELECT id FROM relationships WHERE src_type=? AND src_id=? AND relation=? AND dst_type=? AND dst_id=?"
+  ).get(srcType, srcId, relation, dstType, dstId);
+
+  if (existing) {
+    db.run(
+      "UPDATE relationships SET weight=?, metadata_json=?, updated_at=? WHERE id=?",
+      [weight, metadata_json, now, existing.id]
+    );
+    return { linked: existing.id, updated: true };
+  }
+
+  const id = newId("rel");
+  db.run(
+    "INSERT INTO relationships (id,src_type,src_id,dst_type,dst_id,relation,weight,metadata_json,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?)",
+    [id, srcType, srcId, dstType, dstId, relation, weight, metadata_json, now, now]
+  );
+  return { linked: id, updated: false };
+}
+
+function cmdLinks(db: Database, args: string[]): object {
+  const [type, id] = args;
+  if (!type || !id) throw new Error("Usage: links <type> <id> [--direction out|in|both] [--relation <name>] [--limit <n>]");
+
+  const direction = (getFlag(args, "--direction") || "both") as "out" | "in" | "both";
+  const relation = getFlag(args, "--relation");
+  const limit = parseInt(getFlag(args, "--limit") || "20", 10);
+
+  type RelRow = { id: string; src_type: string; src_id: string; dst_type: string; dst_id: string; relation: string; weight: number; metadata_json: string };
+
+  const rows: RelRow[] = [];
+  const relFilter = relation ? " AND relation = ?" : "";
+
+  if (direction === "out" || direction === "both") {
+    const q = `SELECT * FROM relationships WHERE src_type=? AND src_id=?${relFilter} LIMIT ?`;
+    const params: (string | number)[] = relation ? [type, id, relation, limit] : [type, id, limit];
+    rows.push(...db.query<RelRow, (string | number)[]>(q).all(...params));
+  }
+  if (direction === "in" || direction === "both") {
+    const q = `SELECT * FROM relationships WHERE dst_type=? AND dst_id=?${relFilter} LIMIT ?`;
+    const params: (string | number)[] = relation ? [type, id, relation, limit] : [type, id, limit];
+    rows.push(...db.query<RelRow, (string | number)[]>(q).all(...params));
+  }
+
+  // Deduplicate by id
+  const seen = new Set<string>();
+  const unique = rows.filter((r) => { if (seen.has(r.id)) return false; seen.add(r.id); return true; });
+
+  return {
+    type, id, direction, count: unique.length,
+    links: unique.map((r) => ({
+      id: r.id,
+      src: { type: r.src_type, id: r.src_id },
+      dst: { type: r.dst_type, id: r.dst_id },
+      relation: r.relation,
+      weight: r.weight,
+      metadata: JSON.parse(r.metadata_json),
+    })),
+  };
+}
+
+function cmdUnlink(db: Database, args: string[]): object {
+  const [relId] = args;
+  if (!relId) throw new Error("Usage: unlink <relationship_id>");
+
+  const existing = db.query<{ id: string }, [string]>("SELECT id FROM relationships WHERE id = ?").get(relId);
+  if (!existing) throw new Error(`Relationship not found: ${relId}`);
+
+  db.run("DELETE FROM relationships WHERE id = ?", [relId]);
+  return { unlinked: relId };
+}
+
+/** Load one-hop linked neighbours for a set of primary search hits. */
+function expandLinks(
+  db: Database,
+  hits: SearchResult[],
+  linkRelations: string[] | null,
+  linkLimit: number
+): SearchResult[] {
+  const extra: SearchResult[] = [];
+  const seen = new Set(hits.map((h) => `${h.type}:${h.id}`));
+  const relFilter = linkRelations ? ` AND relation IN (${linkRelations.map(() => "?").join(",")})` : "";
+
+  for (const hit of hits) {
+    if (extra.length >= linkLimit) break;
+    const params: (string | number)[] = linkRelations
+      ? [hit.type, hit.id, ...linkRelations, linkLimit]
+      : [hit.type, hit.id, linkLimit];
+    type NRow = { dst_type: string; dst_id: string; relation: string };
+    type NRowIn = { src_type: string; src_id: string; relation: string };
+
+    // Outgoing
+    const outRows = db.query<NRow, (string | number)[]>(
+      `SELECT dst_type, dst_id, relation FROM relationships WHERE src_type=? AND src_id=?${relFilter} LIMIT ?`
+    ).all(...params);
+    for (const row of outRows) {
+      const key = `${row.dst_type}:${row.dst_id}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      extra.push({ id: row.dst_id, type: row.dst_type, tier: "linked", snippet: `linked via ${row.relation}`, score: 25 });
+      if (extra.length >= linkLimit) break;
+    }
+
+    // Incoming
+    const inParams: (string | number)[] = linkRelations
+      ? [hit.type, hit.id, ...linkRelations, linkLimit]
+      : [hit.type, hit.id, linkLimit];
+    const inRows = db.query<NRowIn, (string | number)[]>(
+      `SELECT src_type, src_id, relation FROM relationships WHERE dst_type=? AND dst_id=?${relFilter} LIMIT ?`
+    ).all(...inParams);
+    for (const row of inRows) {
+      const key = `${row.src_type}:${row.src_id}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      extra.push({ id: row.src_id, type: row.src_type, tier: "linked", snippet: `linked via ${row.relation}`, score: 25 });
+      if (extra.length >= linkLimit) break;
+    }
+  }
+  return extra;
+}
+
 // ─── Argument Parsing ──────────────────────────────────────────────
 
 function getFlag(args: string[], flag: string): string | undefined {
@@ -717,7 +895,7 @@ function main(): void {
       JSON.stringify({
         ok: false,
         error: "no command provided",
-        usage: "bun run scripts/memory.ts <save|recall|status|remember|context> [args]",
+        usage: "bun run scripts/memory.ts <save|recall|status|remember|context|link|links|unlink> [args]",
       })
     );
     process.exit(2);
@@ -749,12 +927,21 @@ function main(): void {
       case "context":
         result = cmdContext(db, cleanArgs);
         break;
+      case "link":
+        result = cmdLink(db, cleanArgs);
+        break;
+      case "links":
+        result = cmdLinks(db, cleanArgs);
+        break;
+      case "unlink":
+        result = cmdUnlink(db, cleanArgs);
+        break;
       default:
         console.log(
           JSON.stringify({
             ok: false,
             error: `unknown command '${command}'`,
-            commands: ["save", "recall", "status", "remember", "context"],
+            commands: ["save", "recall", "status", "remember", "context", "link", "links", "unlink"],
           })
         );
         process.exit(2);

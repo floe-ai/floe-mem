@@ -106,6 +106,13 @@ From the skill directory (this file):
 | `bun run scripts/memory.ts save "<text>" --type <type> --tags <tags>` | Save a memory |
 | `bun run scripts/memory.ts remember <file> [file...]` | Register and index file(s) |
 | `bun run scripts/memory.ts status` | Show memory overview |
+| `bun run scripts/memory.ts link <src_type> <src_id> <relation> <dst_type> <dst_id>` | Create a relationship |
+| `bun run scripts/memory.ts links <type> <id> [--direction out\|in\|both]` | Query relationships |
+| `bun run scripts/memory.ts unlink <relationship_id>` | Remove a relationship |
+
+**Relationship flags:** `--weight <n>`, `--meta <json>`, `--relation <name>`, `--limit <n>`
+
+**Retrieval flags:** `recall` and `context` accept `--expand-links` to include one-hop linked neighbours in results. Filter with `--link-relations <csv>` and `--link-limit <n>`.
 
 ### Memory types
 
