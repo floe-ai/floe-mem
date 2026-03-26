@@ -97,7 +97,7 @@ Bad records state what happened without explaining why.
 
 ## Quick reference
 
-From the skill directory (`.agents/skills/context-memory/`, `.github/`, or `.claude/`):
+From the skill directory (this file):
 
 | Command | What it does |
 |---------|-------------|
@@ -124,4 +124,4 @@ From the skill directory (`.agents/skills/context-memory/`, `.github/`, or `.cla
 - **Write before you finish.** Every task that produces knowledge should leave a memory record.
 - Keep records concise but complete — capture decisions, reasoning, and constraints.
 - All file references in memory are relative paths from the project root.
-- The memory database is stored at `.ai/memory/memory.db` and is gitignored.
+- The memory database is stored at `../../.ai/memory/memory.db` and is gitignored.
