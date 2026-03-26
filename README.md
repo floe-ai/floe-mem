@@ -22,14 +22,13 @@ bunx github:floe-ai/floe-mem
 
 The guided installer prompts for:
 - target clients (`Codex`, `Copilot`, `Claude`)
-- scope (`project` or `global`)
 - confirmation of resolved install paths
 
-It copies `SKILL.md` + `scripts/memory.ts` into the selected targets. That's it — no other dependencies.
+It copies `SKILL.md` + `scripts/memory.ts` into `<project-root>/{.agents|.github|.claude}/skills/context-memory/`. Run it from your **project root**.
 
 **CLI flags (skip prompts):**
 ```bash
-bunx github:floe-ai/floe-mem --target codex,copilot --scope project --yes
+bunx github:floe-ai/floe-mem --target codex,copilot --yes
 ```
 
 **Local install (from cloned repo):**

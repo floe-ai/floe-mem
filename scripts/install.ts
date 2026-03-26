@@ -22,7 +22,6 @@ import { parseArgs } from "node:util";
 const SKILL_NAME = "context-memory";
 const CLIENTS = ["codex", "copilot", "claude"] as const;
 type Client = (typeof CLIENTS)[number];
-type Scope = "project" | "global";
 
 // ---------------------------------------------------------------------------
 // Path resolution
@@ -40,20 +39,11 @@ function skillSourceDir(): string {
   throw new Error(`skill source not found at: ${candidate}`);
 }
 
-function targetDir(client: Client, scope: Scope, projectRoot: string): string {
-  if (scope === "project") {
-    const dirs: Record<Client, string> = {
-      codex: join(projectRoot, ".agents", "skills", SKILL_NAME),
-      copilot: join(projectRoot, ".github", "skills", SKILL_NAME),
-      claude: join(projectRoot, ".claude", "skills", SKILL_NAME),
-    };
-    return dirs[client];
-  }
-  const home = homedir();
+function targetDir(client: Client, projectRoot: string): string {
   const dirs: Record<Client, string> = {
-    codex: join(home, ".agents", "skills", SKILL_NAME),
-    copilot: join(home, ".copilot", "skills", SKILL_NAME),
-    claude: join(home, ".claude", "skills", SKILL_NAME),
+    codex: join(projectRoot, ".agents", "skills", SKILL_NAME),
+    copilot: join(projectRoot, ".github", "skills", SKILL_NAME),
+    claude: join(projectRoot, ".claude", "skills", SKILL_NAME),
   };
   return dirs[client];
 }
@@ -88,16 +78,6 @@ async function selectClients(rl: ReturnType<typeof createInterface>): Promise<Cl
   return picked;
 }
 
-async function selectScope(rl: ReturnType<typeof createInterface>): Promise<Scope> {
-  console.log("\nInstall scope:");
-  console.log("  1) project (recommended) — installs inside the current project");
-  console.log("  2) global  — installs in your home directory");
-  const raw = (await ask(rl, "> ")).trim().toLowerCase();
-  if (raw === "" || raw === "1" || raw === "project") return "project";
-  if (raw === "2" || raw === "global") return "global";
-  throw new Error(`unknown scope: '${raw}'`);
-}
-
 async function confirm(rl: ReturnType<typeof createInterface>, message: string): Promise<boolean> {
   const raw = (await ask(rl, `${message} [Y/n] `)).trim().toLowerCase();
   return raw === "" || raw === "y" || raw === "yes";
@@ -109,7 +89,6 @@ async function confirm(rl: ReturnType<typeof createInterface>, message: string):
 
 interface InstallResult {
   client: Client;
-  scope: Scope;
   targetDir: string;
   status: "installed" | "skipped" | "failed";
   error?: string;
@@ -133,7 +112,6 @@ async function main() {
     args: Bun.argv.slice(2),
     options: {
       target: { type: "string" },
-      scope: { type: "string" },
       "project-root": { type: "string" },
       force: { type: "boolean", default: false },
       yes: { type: "boolean", default: false },
@@ -152,30 +130,23 @@ async function main() {
 
   try {
     let clients: Client[];
-    let scope: Scope;
 
     if (nonInteractive || !process.stdout.isTTY) {
       const rawTarget = values["target"] as string | undefined;
       clients = rawTarget
         ? (rawTarget.split(",").map((t) => t.trim().toLowerCase()) as Client[])
         : [...CLIENTS];
-      scope = (values["scope"] as Scope | undefined) ?? "project";
     } else {
       clients =
         values["target"] != null
           ? (values["target"].split(",").map((t) => t.trim().toLowerCase()) as Client[])
           : await selectClients(rl);
-      scope =
-        values["scope"] != null
-          ? (values["scope"] as Scope)
-          : await selectScope(rl);
     }
 
     const source = skillSourceDir();
     const targets = clients.map((c) => ({
       client: c,
-      scope,
-      dir: targetDir(c, scope, projectRoot),
+      dir: targetDir(c, projectRoot),
     }));
 
     if (!values["yes"] && process.stdout.isTTY) {
@@ -196,11 +167,11 @@ async function main() {
     for (const t of targets) {
       try {
         installOne(source, t.dir, Boolean(values["force"]));
-        results.push({ client: t.client, scope, targetDir: t.dir, status: "installed" });
+        results.push({ client: t.client, targetDir: t.dir, status: "installed" });
         console.log(`  ✓ ${t.client.padEnd(10)} → ${shortPath(t.dir)}`);
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
-        results.push({ client: t.client, scope, targetDir: t.dir, status: "failed", error: msg });
+        results.push({ client: t.client, targetDir: t.dir, status: "failed", error: msg });
         console.error(`  ✗ ${t.client.padEnd(10)} → ${msg}`);
       }
     }

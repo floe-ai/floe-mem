@@ -47,7 +47,6 @@ describe("install.ts", () => {
 
     const { exitCode, stderr } = await runInstaller([
       "--target", "codex",
-      "--scope", "project",
       "--project-root", root,
       "--yes",
       "--non-interactive",
@@ -60,30 +59,11 @@ describe("install.ts", () => {
     expect(existsSync(join(skillDir, "scripts", "memory.ts"))).toBe(true);
   });
 
-  it("installs claude global-scope skill files", async () => {
-    const home = tempDir();
-    tmpDirs.push(home);
-
-    const { exitCode } = await runInstaller([
-      "--target", "claude",
-      "--scope", "global",
-      "--yes",
-      "--non-interactive",
-    ], { HOME: home });
-
-    expect(exitCode).toBe(0);
-    const skillDir = join(home, ".claude", "skills", "context-memory");
-    expect(existsSync(skillDir)).toBe(true);
-    expect(existsSync(join(skillDir, "SKILL.md"))).toBe(true);
-    expect(existsSync(join(skillDir, "scripts", "memory.ts"))).toBe(true);
-  });
-
   it("installs all clients when --target is omitted", async () => {
     const root = tempDir();
     tmpDirs.push(root);
 
     const { exitCode } = await runInstaller([
-      "--scope", "project",
       "--project-root", root,
       "--yes",
       "--non-interactive",
@@ -106,7 +86,6 @@ describe("install.ts", () => {
 
     await runInstaller([
       "--target", "copilot",
-      "--scope", "project",
       "--project-root", root,
       "--yes",
       "--non-interactive",
@@ -114,7 +93,6 @@ describe("install.ts", () => {
 
     const { exitCode, stderr } = await runInstaller([
       "--target", "copilot",
-      "--scope", "project",
       "--project-root", root,
       "--yes",
       "--non-interactive",
@@ -130,7 +108,6 @@ describe("install.ts", () => {
 
     await runInstaller([
       "--target", "codex",
-      "--scope", "project",
       "--project-root", root,
       "--yes",
       "--non-interactive",
@@ -138,7 +115,6 @@ describe("install.ts", () => {
 
     const { exitCode } = await runInstaller([
       "--target", "codex",
-      "--scope", "project",
       "--project-root", root,
       "--force",
       "--yes",
@@ -154,7 +130,6 @@ describe("install.ts", () => {
 
     await runInstaller([
       "--target", "codex",
-      "--scope", "project",
       "--project-root", root,
       "--yes",
       "--non-interactive",
