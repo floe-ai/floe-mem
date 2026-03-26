@@ -19,15 +19,21 @@ import { resolve, dirname, relative } from "path";
 // ─── Configuration ─────────────────────────────────────────────────
 
 /**
- * Find the project root by walking up from the script's own directory until
- * we find a .git directory. This lets agents invoke the script from the skill
- * directory and still land the DB at the actual project root.
- * Falls back to cwd if no .git is found (e.g. project not yet initialised).
+ * Resolve the project root. When installed project-locally, the script lives at:
+ *   <project-root>/{.agents|.github|.claude}/skills/context-memory/scripts/memory.ts
+ * Walk up from the script's directory until we find a folder that contains
+ * one of those client directories as a sibling — that folder is the project root.
+ * For .git repos we also accept the .git marker.
+ * Falls back to process.cwd() for global installs (no client-dir siblings present).
  */
 function findProjectRoot(): string {
-  let dir = dirname(import.meta.path);
+  const CLIENT_DIRS = [".agents", ".github", ".claude"];
+  let dir = import.meta.dir;
   for (let i = 0; i < 20; i++) {
-    if (existsSync(resolve(dir, ".git"))) return dir;
+    if (
+      existsSync(resolve(dir, ".git")) ||
+      CLIENT_DIRS.some((d) => existsSync(resolve(dir, d)))
+    ) return dir;
     const parent = resolve(dir, "..");
     if (parent === dir) break;
     dir = parent;
