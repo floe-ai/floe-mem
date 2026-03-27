@@ -253,3 +253,113 @@ test("discovery indexes .ai artefacts but skips .ai/memory", () => {
   expect(out.result.registered[0].file).toContain("notes.md");
 });
 
+// ─── Scoring: pure unit tests (direct import) ──────────────────────
+
+import { getRelationFactor, computeExpandedScore } from "../skills/context-memory/scripts/memory.ts";
+
+test("getRelationFactor: known relations", () => {
+  expect(getRelationFactor("derived_from")).toBe(1.00);
+  expect(getRelationFactor("continues")).toBe(1.00);
+  expect(getRelationFactor("depends_on")).toBe(1.00);
+  expect(getRelationFactor("blocks")).toBe(1.00);
+  expect(getRelationFactor("describes")).toBe(1.00);
+  expect(getRelationFactor("belongs_to")).toBe(0.85);
+  expect(getRelationFactor("supersedes")).toBe(0.85);
+  expect(getRelationFactor("relates_to")).toBe(0.60);
+  expect(getRelationFactor("mentions")).toBe(0.35);
+});
+
+test("getRelationFactor: unknown relation returns 0.60", () => {
+  expect(getRelationFactor("invented_relation")).toBe(0.60);
+  expect(getRelationFactor("")).toBe(0.60);
+});
+
+test("getRelationFactor: case-insensitive", () => {
+  expect(getRelationFactor("DERIVED_FROM")).toBe(1.00);
+  expect(getRelationFactor("Relates_To")).toBe(0.60);
+});
+
+// Spec test A: source=80, derived_from, weight=1.0 → 80 * 0.30 * 1.00 * 1.0 = 24.0
+test("computeExpandedScore: spec case A — basic formula", () => {
+  expect(computeExpandedScore(80, "derived_from", 1.0)).toBe(24.0);
+});
+
+// Spec test B: relation factor ordering
+test("computeExpandedScore: spec case B — relation factor ordering", () => {
+  const derivedScore = computeExpandedScore(100, "derived_from", 1.0);
+  const relatesToScore = computeExpandedScore(100, "relates_to", 1.0);
+  const mentionsScore = computeExpandedScore(100, "mentions", 1.0);
+  expect(derivedScore).toBeGreaterThan(relatesToScore);
+  expect(relatesToScore).toBeGreaterThan(mentionsScore);
+});
+
+// Spec test C: edge weight effect
+test("computeExpandedScore: spec case C — stronger weight ranks higher", () => {
+  const heavy = computeExpandedScore(100, "relates_to", 2.0);
+  const light = computeExpandedScore(100, "relates_to", 0.5);
+  expect(heavy).toBeGreaterThan(light);
+});
+
+// Spec test D: unknown relation uses 0.60
+test("computeExpandedScore: spec case D — unknown relation uses 0.60", () => {
+  const unknown = computeExpandedScore(100, "some_new_relation", 1.0);
+  const relatesto = computeExpandedScore(100, "relates_to", 1.0);
+  expect(unknown).toBe(relatesto); // both use factor 0.60
+});
+
+// Spec test E: cap at source_score * 0.95
+test("computeExpandedScore: spec case E — cap enforced with high edge weight", () => {
+  const score = computeExpandedScore(100, "derived_from", 100.0);
+  expect(score).toBe(95.0); // capped at 100 * 0.95
+});
+
+test("computeExpandedScore: invalid edge weight defaults to 1.0", () => {
+  expect(computeExpandedScore(80, "derived_from", 0)).toBe(24.0);   // weight 0 → use 1.0
+  expect(computeExpandedScore(80, "derived_from", -1)).toBe(24.0);  // negative → use 1.0
+  expect(computeExpandedScore(80, "derived_from", NaN)).toBe(24.0); // NaN → use 1.0
+});
+
+// ─── Scoring: integration tests via CLI ────────────────────────────
+
+// Spec test F: dedup — same linked entity from two source hits → one result, highest score
+test("expand-links dedup: spec case F — highest score wins across source hits", () => {
+  const dbPath = join(tmpDir, ".ai", "memory", "memory.db");
+
+  // Two source memories with different scores via different search tiers
+  const high = parseOutput(runMemory(["save", "exact match target high score", "--type", "decision", "--db", dbPath], tmpDir).stdout).result.saved;
+  const low  = parseOutput(runMemory(["save", "another memory lower score",   "--type", "learning", "--db", dbPath], tmpDir).stdout).result.saved;
+  const target = parseOutput(runMemory(["save", "shared neighbour",             "--type", "learning", "--db", dbPath], tmpDir).stdout).result.saved;
+
+  // Both source hits link to the same target
+  runMemory(["link", "memory", high, "derived_from", "memory", target, "--db", dbPath], tmpDir);
+  runMemory(["link", "memory", low,  "relates_to",   "memory", target, "--db", dbPath], tmpDir);
+
+  const out = parseOutput(
+    runMemory(["recall", "exact match target high score", "--limit", "5", "--expand-links", "--link-limit", "10", "--db", dbPath], tmpDir).stdout
+  );
+  expect(out.ok).toBe(true);
+
+  // target should appear exactly once
+  const targetHits = out.result.memories.filter((m: any) => m.id === target);
+  expect(targetHits.length).toBe(1);
+
+  // The kept score should be the higher one (derived_from from high-scoring source)
+  const keptScore = targetHits[0].score;
+  const lowScore = computeExpandedScore(30, "relates_to", 1.0); // low source would give lower
+  expect(keptScore).toBeGreaterThan(lowScore);
+});
+
+// Spec test G: no behaviour change without --expand-links
+test("expand-links: spec case G — ranking unchanged without flag", () => {
+  const dbPath = join(tmpDir, ".ai", "memory", "memory.db");
+  const m1 = parseOutput(runMemory(["save", "baseline memory", "--type", "learning", "--db", dbPath], tmpDir).stdout).result.saved;
+  const m2 = parseOutput(runMemory(["save", "linked other",    "--type", "learning", "--db", dbPath], tmpDir).stdout).result.saved;
+  runMemory(["link", "memory", m1, "relates_to", "memory", m2, "--db", dbPath], tmpDir);
+
+  const without = parseOutput(runMemory(["recall", "baseline memory", "--db", dbPath], tmpDir).stdout);
+  const ids = without.result.memories.map((m: any) => m.id);
+  // m2 should NOT appear — no --expand-links
+  expect(ids).not.toContain(m2);
+});
+
+

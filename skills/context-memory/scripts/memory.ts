@@ -567,7 +567,8 @@ function cmdRecall(db: Database, args: string[]): object {
   const results = search(db, query, limit);
   if (expandLinks_) {
     const neighbours = expandLinks(db, results, linkRelations, linkLimit);
-    return { query, count: results.length + neighbours.length, memories: [...results, ...neighbours] };
+    const merged = [...results, ...neighbours].sort((a, b) => b.score - a.score);
+    return { query, count: merged.length, memories: merged };
   }
   return { query, count: results.length, memories: results };
 }
@@ -690,6 +691,7 @@ function cmdContext(db: Database, args: string[]): object {
   const directResults = search(db, objective, 40);
   const allResults = expandLinks_
     ? [...directResults, ...expandLinks(db, directResults, linkRelations, linkLimit)]
+        .sort((a, b) => b.score - a.score)
     : directResults;
 
   // Build bundle within token budget
@@ -826,53 +828,99 @@ function cmdUnlink(db: Database, args: string[]): object {
   return { unlinked: relId };
 }
 
-/** Load one-hop linked neighbours for a set of primary search hits. */
+// ─── Link Expansion Scoring ────────────────────────────────────────
+
+const HOP_DECAY = 0.30;
+
+const RELATION_FACTORS: Record<string, number> = {
+  derived_from: 1.00,
+  continues:    1.00,
+  depends_on:   1.00,
+  blocks:       1.00,
+  describes:    1.00,
+  belongs_to:   0.85,
+  supersedes:   0.85,
+  relates_to:   0.60,
+  mentions:     0.35,
+};
+
+export function getRelationFactor(relation: string): number {
+  return RELATION_FACTORS[relation.toLowerCase()] ?? 0.60;
+}
+
+export function computeExpandedScore(
+  sourceScore: number,
+  relation: string,
+  edgeWeight: number
+): number {
+  const weight = edgeWeight > 0 && isFinite(edgeWeight) ? edgeWeight : 1.0;
+  const raw = sourceScore * HOP_DECAY * getRelationFactor(relation) * weight;
+  const cap = sourceScore * 0.95;
+  return Math.min(raw, cap);
+}
+
+/** Load one-hop linked neighbours for a set of primary search hits, scored relative to their source. */
 function expandLinks(
   db: Database,
   hits: SearchResult[],
   linkRelations: string[] | null,
   linkLimit: number
 ): SearchResult[] {
-  const extra: SearchResult[] = [];
-  const seen = new Set(hits.map((h) => `${h.type}:${h.id}`));
+  // Direct-hit keys — never re-surface a direct result as a linked neighbour
+  const directKeys = new Set(hits.map((h) => `${h.type}:${h.id}`));
   const relFilter = linkRelations ? ` AND relation IN (${linkRelations.map(() => "?").join(",")})` : "";
 
+  // Collect all candidate neighbours into a Map keyed by (type:id).
+  // If the same entity is reachable from multiple source hits, keep the highest score.
+  type Candidate = { id: string; type: string; relation: string; score: number };
+  const best = new Map<string, Candidate>();
+
+  function consider(entityType: string, entityId: string, relation: string, weight: number, sourceScore: number): void {
+    const key = `${entityType}:${entityId}`;
+    if (directKeys.has(key)) return;
+    const score = computeExpandedScore(sourceScore, relation, weight);
+    const existing = best.get(key);
+    if (!existing || score > existing.score) {
+      best.set(key, { id: entityId, type: entityType, relation, score });
+    }
+  }
+
+  type NRow = { dst_type: string; dst_id: string; relation: string; weight: number };
+  type NRowIn = { src_type: string; src_id: string; relation: string; weight: number };
+
   for (const hit of hits) {
-    if (extra.length >= linkLimit) break;
     const params: (string | number)[] = linkRelations
       ? [hit.type, hit.id, ...linkRelations, linkLimit]
       : [hit.type, hit.id, linkLimit];
-    type NRow = { dst_type: string; dst_id: string; relation: string };
-    type NRowIn = { src_type: string; src_id: string; relation: string };
 
-    // Outgoing
+    // Outgoing edges
     const outRows = db.query<NRow, (string | number)[]>(
-      `SELECT dst_type, dst_id, relation FROM relationships WHERE src_type=? AND src_id=?${relFilter} LIMIT ?`
+      `SELECT dst_type, dst_id, relation, weight FROM relationships WHERE src_type=? AND src_id=?${relFilter} LIMIT ?`
     ).all(...params);
     for (const row of outRows) {
-      const key = `${row.dst_type}:${row.dst_id}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      extra.push({ id: row.dst_id, type: row.dst_type, tier: "linked", snippet: `linked via ${row.relation}`, score: 25 });
-      if (extra.length >= linkLimit) break;
+      consider(row.dst_type, row.dst_id, row.relation, row.weight, hit.score);
     }
 
-    // Incoming
-    const inParams: (string | number)[] = linkRelations
-      ? [hit.type, hit.id, ...linkRelations, linkLimit]
-      : [hit.type, hit.id, linkLimit];
+    // Incoming edges
     const inRows = db.query<NRowIn, (string | number)[]>(
-      `SELECT src_type, src_id, relation FROM relationships WHERE dst_type=? AND dst_id=?${relFilter} LIMIT ?`
-    ).all(...inParams);
+      `SELECT src_type, src_id, relation, weight FROM relationships WHERE dst_type=? AND dst_id=?${relFilter} LIMIT ?`
+    ).all(...params);
     for (const row of inRows) {
-      const key = `${row.src_type}:${row.src_id}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      extra.push({ id: row.src_id, type: row.src_type, tier: "linked", snippet: `linked via ${row.relation}`, score: 25 });
-      if (extra.length >= linkLimit) break;
+      consider(row.src_type, row.src_id, row.relation, row.weight, hit.score);
     }
   }
-  return extra;
+
+  // Deduplicated by (type:id), sorted by score descending, capped at linkLimit
+  return Array.from(best.values())
+    .sort((a, b) => b.score - a.score)
+    .slice(0, linkLimit)
+    .map((c) => ({
+      id: c.id,
+      type: c.type,
+      tier: "linked" as const,
+      snippet: `linked via ${c.relation}`,
+      score: c.score,
+    }));
 }
 
 // ─── Argument Parsing ──────────────────────────────────────────────
@@ -959,4 +1007,4 @@ function main(): void {
   }
 }
 
-main();
+if (import.meta.main) main();
