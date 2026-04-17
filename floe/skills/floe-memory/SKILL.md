@@ -110,6 +110,9 @@ To pull in linked neighbors:
 bun run .floe/memory/scripts/memory.ts recall "your task description" --expand-links
 ```
 
+By default, retired memories are hidden in retrieval results. Use
+`--include-retired` on `recall` or `context` when you need historical records.
+
 ### Retrieval rules
 
 - Retrieve narrowly around the active objective, not the whole project.
@@ -191,6 +194,12 @@ Do not claim that a memory or document record was deleted unless the runtime
 adds a real delete command. Today, record cleanup means updating, superseding,
 or leaving the record alone.
 
+To retire a memory without deleting it:
+
+```bash
+bun run .floe/memory/scripts/memory.ts deprecate <memory-id> --replacement <new-memory-id> --reason "why it was replaced"
+```
+
 ### Leave memory alone
 
 Do not save or update memory just to mirror a temporary status if the durable
@@ -265,6 +274,8 @@ From the project root:
 | `bun run .floe/memory/scripts/memory.ts context "<objective>"` | Build a richer context bundle |
 | `bun run .floe/memory/scripts/memory.ts save "<text>" --type <type> --tags <tags>` | Save a new memory |
 | `bun run .floe/memory/scripts/memory.ts save "<text>" --record-id <memory-id> ...` | Update an existing memory in place |
+| `bun run .floe/memory/scripts/memory.ts deprecate <memory-id> [--replacement <memory-id>]` | Mark a memory as deprecated, with optional replacement pointer |
+| `bun run .floe/memory/scripts/memory.ts duplicate-audit` | Surface likely duplicate/merge candidates without mutating records |
 | `bun run .floe/memory/scripts/memory.ts remember <file> [file...]` | Register and index file(s) |
 | `bun run .floe/memory/scripts/memory.ts status` | Show memory overview |
 | `bun run .floe/memory/scripts/memory.ts link <src_type> <src_id> <relation> <dst_type> <dst_id>` | Create or update a relationship |
@@ -274,6 +285,7 @@ From the project root:
 ### Retrieval flags
 
 - `recall` and `context` support `--expand-links`
+- `recall` and `context` support `--include-retired`
 - filter link expansion with `--link-relations <csv>`
 - cap linked neighbors with `--link-limit <n>`
 

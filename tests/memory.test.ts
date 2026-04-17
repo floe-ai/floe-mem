@@ -98,6 +98,8 @@ test("status shows counts", () => {
   expect(exitCode).toBe(0);
   expect(out.ok).toBe(true);
   expect(out.result.memories).toBe(1);
+  expect(out.result.active_memories).toBe(1);
+  expect(out.result.deprecated_memories).toBe(0);
   expect(out.result.recent.length).toBe(1);
 });
 
@@ -255,6 +257,77 @@ test("recall --expand-links returns linked neighbours", () => {
   expect(ids).toContain(m2);
   const neighbour = out.result.memories.find((m: any) => m.id === m2);
   expect(neighbour.tier).toBe("linked");
+});
+
+test("recall hides superseded memories by default and includes with --include-retired", () => {
+  const dbPath = join(tmpDir, ".floe", "memory", "memory.db");
+  const oldMem = parseOutput(
+    runMemory(["save", "memory hygiene operating model", "--type", "pattern", "--db", dbPath], tmpDir).stdout
+  ).result.saved;
+  const newMem = parseOutput(
+    runMemory(["save", "memory hygiene operating model updated", "--type", "pattern", "--db", dbPath], tmpDir).stdout
+  ).result.saved;
+  runMemory(["link", "memory", newMem, "supersedes", "memory", oldMem, "--db", dbPath], tmpDir);
+
+  const hidden = parseOutput(
+    runMemory(["recall", "memory hygiene operating model", "--db", dbPath], tmpDir).stdout
+  );
+  const visible = parseOutput(
+    runMemory(["recall", "memory hygiene operating model", "--include-retired", "--db", dbPath], tmpDir).stdout
+  );
+
+  const hiddenIds = hidden.result.memories.map((m: any) => m.id);
+  const visibleIds = visible.result.memories.map((m: any) => m.id);
+  expect(hiddenIds).not.toContain(oldMem);
+  expect(visibleIds).toContain(oldMem);
+});
+
+test("deprecate marks memory retired and can link replacement", () => {
+  const dbPath = join(tmpDir, ".floe", "memory", "memory.db");
+  const oldMem = parseOutput(
+    runMemory(["save", "legacy process note", "--type", "pattern", "--db", dbPath], tmpDir).stdout
+  ).result.saved;
+  const replacement = parseOutput(
+    runMemory(["save", "new process note", "--type", "pattern", "--db", dbPath], tmpDir).stdout
+  ).result.saved;
+
+  const dep = parseOutput(
+    runMemory(
+      ["deprecate", oldMem, "--replacement", replacement, "--reason", "replaced by newer workflow", "--db", dbPath],
+      tmpDir
+    ).stdout
+  );
+  expect(dep.ok).toBe(true);
+  expect(dep.result.deprecated).toBe(oldMem);
+  expect(dep.result.replacement).toBe(replacement);
+
+  const hidden = parseOutput(runMemory(["recall", "legacy process note", "--db", dbPath], tmpDir).stdout);
+  const visible = parseOutput(
+    runMemory(["recall", "legacy process note", "--include-retired", "--db", dbPath], tmpDir).stdout
+  );
+  expect(hidden.result.memories.map((m: any) => m.id)).not.toContain(oldMem);
+  expect(visible.result.memories.map((m: any) => m.id)).toContain(oldMem);
+
+  const links = parseOutput(
+    runMemory(["links", "memory", replacement, "--direction", "out", "--relation", "supersedes", "--db", dbPath], tmpDir).stdout
+  );
+  expect(links.ok).toBe(true);
+  expect(links.result.count).toBeGreaterThan(0);
+});
+
+test("duplicate-audit returns structured merge candidates", () => {
+  const dbPath = join(tmpDir, ".floe", "memory", "memory.db");
+  runMemory(["save", "JWT auth model with refresh token rotation", "--type", "decision", "--db", dbPath], tmpDir);
+  runMemory(["save", "JWT auth model with refresh token rotation", "--type", "decision", "--db", dbPath], tmpDir);
+
+  const audit = parseOutput(
+    runMemory(["duplicate-audit", "--min-score", "0.5", "--db", dbPath], tmpDir).stdout
+  );
+  expect(audit.ok).toBe(true);
+  expect(audit.result.count).toBeGreaterThan(0);
+  expect(audit.result.candidates[0].keep_id).toMatch(/^mem_/);
+  expect(audit.result.candidates[0].retire_id).toMatch(/^mem_/);
+  expect(audit.result.candidates[0].commands.length).toBeGreaterThan(0);
 });
 
 // ─── Discovery: .floe runtime isolation ────────────────────────────

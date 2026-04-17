@@ -66,8 +66,13 @@ Common commands:
 | `bun run .floe/memory/scripts/memory.ts recall "<query>"` | Search memory for relevant context |
 | `bun run .floe/memory/scripts/memory.ts context "<objective>"` | Build a context bundle for a task |
 | `bun run .floe/memory/scripts/memory.ts save "<text>" --type <type> --tags <tags>` | Save a memory |
+| `bun run .floe/memory/scripts/memory.ts deprecate <memory-id> [--replacement <memory-id>]` | Mark a memory deprecated, optionally linked to its replacement |
+| `bun run .floe/memory/scripts/memory.ts duplicate-audit` | Surface likely duplicate/merge candidates (non-mutating) |
 | `bun run .floe/memory/scripts/memory.ts remember <file> [file...]` | Register and index file(s) |
 | `bun run .floe/memory/scripts/memory.ts status` | Show memory overview |
+
+By default, `recall` and `context` hide retired memories (deprecated or superseded).
+Use `--include-retired` when you need historical results.
 
 Memory types: `decision`, `pattern`, `issue`, `learning`, `preference`, `constraint`.
 

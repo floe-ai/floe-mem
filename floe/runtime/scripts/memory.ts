@@ -76,7 +76,7 @@ function findProjectRoot(): string {
 
 const REPO_ROOT = findProjectRoot();
 const DB_PATH = resolve(REPO_ROOT, ".floe/memory/memory.db");
-const SCHEMA_VERSION = 3;
+const SCHEMA_VERSION = 4;
 
 // ─── Database ──────────────────────────────────────────────────────
 
@@ -118,10 +118,15 @@ function initSchema(db: Database): void {
       tags TEXT NOT NULL DEFAULT '[]',
       agent TEXT NOT NULL DEFAULT 'unknown',
       task TEXT NOT NULL DEFAULT '',
+      status TEXT NOT NULL DEFAULT 'active',
+      deprecated_at TEXT,
+      deprecated_reason TEXT NOT NULL DEFAULT '',
+      replacement_memory_id TEXT NOT NULL DEFAULT '',
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     )
   `);
+  ensureMemoriesColumns(db);
   db.run(`
     CREATE TABLE IF NOT EXISTS chunks (
       id TEXT PRIMARY KEY,
@@ -163,6 +168,23 @@ function initSchema(db: Database): void {
     `INSERT OR REPLACE INTO metadata(key, value) VALUES ('schema_version', ?)`,
     [String(SCHEMA_VERSION)]
   );
+}
+
+function ensureMemoriesColumns(db: Database): void {
+  const cols = db.query<{ name: string }, []>("PRAGMA table_info(memories)").all();
+  const existing = new Set(cols.map((c) => c.name));
+  if (!existing.has("status")) {
+    db.run("ALTER TABLE memories ADD COLUMN status TEXT NOT NULL DEFAULT 'active'");
+  }
+  if (!existing.has("deprecated_at")) {
+    db.run("ALTER TABLE memories ADD COLUMN deprecated_at TEXT");
+  }
+  if (!existing.has("deprecated_reason")) {
+    db.run("ALTER TABLE memories ADD COLUMN deprecated_reason TEXT NOT NULL DEFAULT ''");
+  }
+  if (!existing.has("replacement_memory_id")) {
+    db.run("ALTER TABLE memories ADD COLUMN replacement_memory_id TEXT NOT NULL DEFAULT ''");
+  }
 }
 
 // ─── Utilities ─────────────────────────────────────────────────────
@@ -375,9 +397,59 @@ interface SearchResult {
   score: number;
 }
 
-function search(db: Database, query: string, limit: number): SearchResult[] {
+interface RetiredMemoryState {
+  reason: "deprecated" | "superseded" | "deprecated,superseded";
+  replacement_id: string | null;
+}
+
+function getRetiredMemories(db: Database): Map<string, RetiredMemoryState> {
+  const retired = new Map<string, RetiredMemoryState>();
+
+  const deprecatedRows = db
+    .query<{ id: string; replacement_memory_id: string }, []>(
+      "SELECT id, replacement_memory_id FROM memories WHERE status = 'deprecated'"
+    )
+    .all();
+  for (const row of deprecatedRows) {
+    retired.set(row.id, {
+      reason: "deprecated",
+      replacement_id: row.replacement_memory_id || null,
+    });
+  }
+
+  const supersededRows = db
+    .query<{ old_id: string; new_id: string }, []>(
+      "SELECT dst_id as old_id, src_id as new_id FROM relationships WHERE relation = 'supersedes' AND src_type = 'memory' AND dst_type = 'memory'"
+    )
+    .all();
+  for (const row of supersededRows) {
+    const existing = retired.get(row.old_id);
+    if (!existing) {
+      retired.set(row.old_id, {
+        reason: "superseded",
+        replacement_id: row.new_id,
+      });
+      continue;
+    }
+    retired.set(row.old_id, {
+      reason: existing.reason === "deprecated" ? "deprecated,superseded" : existing.reason,
+      replacement_id: existing.replacement_id || row.new_id,
+    });
+  }
+
+  return retired;
+}
+
+function search(
+  db: Database,
+  query: string,
+  limit: number,
+  retired: Map<string, RetiredMemoryState>,
+  includeRetired: boolean
+): SearchResult[] {
   const results: SearchResult[] = [];
   const seen = new Set<string>();
+  const isRetiredMemory = (id: string) => retired.has(id);
 
   // Tier 1: Exact match on document locator or memory ID
   const exactDocs = db
@@ -403,6 +475,7 @@ function search(db: Database, query: string, limit: number): SearchResult[] {
     )
     .all(query);
   for (const mem of exactMems) {
+    if (!includeRetired && isRetiredMemory(mem.id)) continue;
     if (seen.has(mem.id)) continue;
     seen.add(mem.id);
     results.push({
@@ -429,6 +502,7 @@ function search(db: Database, query: string, limit: number): SearchResult[] {
       )
       .all(ftsQuery);
     for (const row of ftsRows) {
+      if (row.source_type === "memory" && !includeRetired && isRetiredMemory(row.source_id)) continue;
       if (seen.has(row.source_id)) continue;
       seen.add(row.source_id);
       results.push({
@@ -452,6 +526,7 @@ function search(db: Database, query: string, limit: number): SearchResult[] {
       )
       .all();
     for (const mem of recentMems) {
+      if (!includeRetired && isRetiredMemory(mem.id)) continue;
       if (seen.has(mem.id)) continue;
       const text = `${mem.title} ${mem.content}`.toLowerCase();
       if (text.includes(query.toLowerCase())) {
@@ -590,20 +665,22 @@ function cmdSave(db: Database, args: string[]): object {
 
 function cmdRecall(db: Database, args: string[]): object {
   const query = args[0];
-  if (!query) throw new Error("query is required. Usage: recall <query> [--limit <n>] [--expand-links] [--link-relations <csv>] [--link-limit <n>]");
+  if (!query) throw new Error("query is required. Usage: recall <query> [--limit <n>] [--expand-links] [--link-relations <csv>] [--link-limit <n>] [--include-retired]");
 
   const limit = parseInt(getFlag(args, "--limit") || "5", 10);
   const expandLinks_ = args.includes("--expand-links");
+  const includeRetired = args.includes("--include-retired");
   const linkRelations = getFlag(args, "--link-relations")?.split(",").map((s) => s.trim()) ?? null;
   const linkLimit = parseInt(getFlag(args, "--link-limit") || "5", 10);
+  const retired = getRetiredMemories(db);
 
-  const results = search(db, query, limit);
+  const results = search(db, query, limit, retired, includeRetired);
   if (expandLinks_) {
-    const neighbours = expandLinks(db, results, linkRelations, linkLimit);
+    const neighbours = expandLinks(db, results, linkRelations, linkLimit, retired, includeRetired);
     const merged = [...results, ...neighbours].sort((a, b) => b.score - a.score);
-    return { query, count: merged.length, memories: merged };
+    return { query, count: merged.length, include_retired: includeRetired, memories: merged };
   }
-  return { query, count: results.length, memories: results };
+  return { query, count: results.length, include_retired: includeRetired, memories: results };
 }
 
 function cmdStatus(db: Database): object {
@@ -613,6 +690,11 @@ function cmdStatus(db: Database): object {
   const memCount =
     db.query<{ c: number }, []>("SELECT COUNT(*) as c FROM memories").get()
       ?.c || 0;
+  const deprecatedCount =
+    db.query<{ c: number }, []>("SELECT COUNT(*) as c FROM memories WHERE status = 'deprecated'").get()
+      ?.c || 0;
+  const retired = getRetiredMemories(db);
+  const supersededCount = Array.from(retired.values()).filter((r) => r.reason.includes("superseded")).length;
   const chunkCount =
     db.query<{ c: number }, []>("SELECT COUNT(*) as c FROM chunks").get()?.c ||
     0;
@@ -627,6 +709,9 @@ function cmdStatus(db: Database): object {
   return {
     documents: docCount,
     memories: memCount,
+    active_memories: Math.max(0, memCount - deprecatedCount),
+    deprecated_memories: deprecatedCount,
+    superseded_memories: supersededCount,
     chunks: chunkCount,
     recent: recent.map((r) => ({
       id: r.id,
@@ -699,7 +784,7 @@ function cmdRemember(db: Database, args: string[]): object {
 
 function cmdContext(db: Database, args: string[]): object {
   const objective = args[0];
-  if (!objective) throw new Error("objective is required. Usage: context <objective> [--profile <profile>] [--expand-links] [--link-relations <csv>] [--link-limit <n>]");
+  if (!objective) throw new Error("objective is required. Usage: context <objective> [--profile <profile>] [--expand-links] [--link-relations <csv>] [--link-limit <n>] [--include-retired]");
 
   const profile = getFlag(args, "--profile") || "implementer";
   const budgetStr = getFlag(args, "--token-budget");
@@ -712,6 +797,7 @@ function cmdContext(db: Database, args: string[]): object {
   };
   const budget = budgetStr ? parseInt(budgetStr, 10) : budgets[profile] || 2200;
   const expandLinks_ = args.includes("--expand-links");
+  const includeRetired = args.includes("--include-retired");
   const linkRelations = getFlag(args, "--link-relations")?.split(",").map((s) => s.trim()) ?? null;
   const linkLimit = parseInt(getFlag(args, "--link-limit") || "5", 10);
 
@@ -719,11 +805,12 @@ function cmdContext(db: Database, args: string[]): object {
   discoverFiles(db);
   indexDocuments(db);
   indexMemories(db);
+  const retired = getRetiredMemories(db);
 
   // Search + optional one-hop expansion
-  const directResults = search(db, objective, 40);
+  const directResults = search(db, objective, 40, retired, includeRetired);
   const allResults = expandLinks_
-    ? [...directResults, ...expandLinks(db, directResults, linkRelations, linkLimit)]
+    ? [...directResults, ...expandLinks(db, directResults, linkRelations, linkLimit, retired, includeRetired)]
         .sort((a, b) => b.score - a.score)
     : directResults;
 
@@ -748,9 +835,201 @@ function cmdContext(db: Database, args: string[]): object {
   return {
     objective,
     profile,
+    include_retired: includeRetired,
     token_budget: budget,
     token_used: usedTokens,
     items,
+  };
+}
+
+function upsertSupersedesRelationship(db: Database, newMemoryId: string, oldMemoryId: string, metadata: object = {}): string {
+  const now = utcNow();
+  const meta = JSON.stringify(metadata);
+  const existing = db.query<{ id: string }, [string, string, string, string, string]>(
+    "SELECT id FROM relationships WHERE src_type=? AND src_id=? AND relation=? AND dst_type=? AND dst_id=?"
+  ).get("memory", newMemoryId, "supersedes", "memory", oldMemoryId);
+
+  if (existing) {
+    db.run(
+      "UPDATE relationships SET weight=?, metadata_json=?, updated_at=? WHERE id=?",
+      [1.0, meta, now, existing.id]
+    );
+    return existing.id;
+  }
+
+  const relId = newId("rel");
+  db.run(
+    "INSERT INTO relationships (id,src_type,src_id,dst_type,dst_id,relation,weight,metadata_json,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?)",
+    [relId, "memory", newMemoryId, "memory", oldMemoryId, "supersedes", 1.0, meta, now, now]
+  );
+  return relId;
+}
+
+function cmdDeprecate(db: Database, args: string[]): object {
+  const [memoryId] = args;
+  if (!memoryId) {
+    throw new Error("Usage: deprecate <memory_id> [--reason <text>] [--replacement <memory_id>]");
+  }
+
+  const exists = db
+    .query<{ id: string }, [string]>("SELECT id FROM memories WHERE id = ?")
+    .get(memoryId);
+  if (!exists) throw new Error(`Memory not found: ${memoryId}`);
+
+  const replacementId = getFlag(args, "--replacement") || "";
+  if (replacementId) {
+    if (replacementId === memoryId) throw new Error("replacement memory must be different from deprecated memory");
+    const replacementExists = db
+      .query<{ id: string }, [string]>("SELECT id FROM memories WHERE id = ?")
+      .get(replacementId);
+    if (!replacementExists) throw new Error(`Replacement memory not found: ${replacementId}`);
+  }
+
+  const reason = getFlag(args, "--reason") || "";
+  const now = utcNow();
+  db.run(
+    "UPDATE memories SET status = 'deprecated', deprecated_at = ?, deprecated_reason = ?, replacement_memory_id = ?, updated_at = ? WHERE id = ?",
+    [now, reason, replacementId, now, memoryId]
+  );
+
+  let linkedSupersedes: string | null = null;
+  if (replacementId) {
+    linkedSupersedes = upsertSupersedesRelationship(db, replacementId, memoryId, {
+      via: "deprecate",
+      reason,
+    });
+  }
+
+  return {
+    deprecated: memoryId,
+    reason,
+    replacement: replacementId || null,
+    linked_supersedes: linkedSupersedes,
+  };
+}
+
+const DUP_TOKEN_RE = /[a-z0-9_][a-z0-9_-]{2,}/g;
+
+function tokenizeForDuplicate(text: string): Set<string> {
+  const hits = (text.toLowerCase().match(DUP_TOKEN_RE) || []).slice(0, 120);
+  return new Set(hits);
+}
+
+function jaccard(a: Set<string>, b: Set<string>): number {
+  if (a.size === 0 && b.size === 0) return 1;
+  const small = a.size < b.size ? a : b;
+  const big = a.size < b.size ? b : a;
+  let overlap = 0;
+  for (const t of small) {
+    if (big.has(t)) overlap += 1;
+  }
+  const union = a.size + b.size - overlap;
+  return union <= 0 ? 0 : overlap / union;
+}
+
+function normalizedTitle(text: string): string {
+  return text.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+function cmdDuplicateAudit(db: Database, args: string[]): object {
+  const limit = parseInt(getFlag(args, "--limit") || "20", 10);
+  const minScore = parseFloat(getFlag(args, "--min-score") || "0.58");
+  const maxScan = parseInt(getFlag(args, "--max-scan") || "300", 10);
+  const includeRetired = args.includes("--include-retired");
+  const retired = getRetiredMemories(db);
+
+  const rows = db
+    .query<{ id: string; type: string; title: string; content: string; updated_at: string }, [number]>(
+      "SELECT id, type, title, content, updated_at FROM memories ORDER BY updated_at DESC LIMIT ?"
+    )
+    .all(maxScan)
+    .filter((m) => includeRetired || !retired.has(m.id));
+
+  type Candidate = {
+    score: number;
+    keep_id: string;
+    retire_id: string;
+    reasons: string[];
+    left: { id: string; title: string; type: string };
+    right: { id: string; title: string; type: string };
+    commands: string[];
+  };
+  const candidates: Candidate[] = [];
+
+  const prepared = rows.map((r) => {
+    const text = `${r.title}\n${r.content}`;
+    return {
+      ...r,
+      normalizedTitle: normalizedTitle(r.title),
+      textDigest: sha256(text.trim().toLowerCase()),
+      tokens: tokenizeForDuplicate(text),
+    };
+  });
+
+  for (let i = 0; i < prepared.length; i += 1) {
+    const a = prepared[i];
+    for (let j = i + 1; j < prepared.length; j += 1) {
+      const b = prepared[j];
+      const sameTitle = a.normalizedTitle.length > 0 && a.normalizedTitle === b.normalizedTitle;
+      const exactText = a.textDigest === b.textDigest;
+      const typeBonus = a.type === b.type ? 0.08 : 0;
+      const tokenScore = jaccard(a.tokens, b.tokens);
+      const titleBonus = sameTitle ? 0.40 : 0;
+      const exactBonus = exactText ? 0.55 : 0;
+      const score = Math.min(1, tokenScore * 0.55 + titleBonus + exactBonus + typeBonus);
+      if (score < minScore) continue;
+
+      const aRetired = retired.has(a.id);
+      const bRetired = retired.has(b.id);
+      let keep = a;
+      let retire = b;
+
+      if (aRetired && !bRetired) {
+        keep = b;
+        retire = a;
+      } else if (!aRetired && bRetired) {
+        keep = a;
+        retire = b;
+      } else if (b.updated_at > a.updated_at) {
+        keep = b;
+        retire = a;
+      }
+
+      const reasons: string[] = [];
+      if (exactText) reasons.push("exact-text");
+      if (sameTitle) reasons.push("same-title");
+      if (tokenScore >= 0.65) reasons.push("high-token-overlap");
+      if (a.type === b.type) reasons.push(`same-type:${a.type}`);
+
+      candidates.push({
+        score: Number(score.toFixed(4)),
+        keep_id: keep.id,
+        retire_id: retire.id,
+        reasons,
+        left: { id: a.id, title: a.title, type: a.type },
+        right: { id: b.id, title: b.title, type: b.type },
+        commands: [
+          `bun run .floe/memory/scripts/memory.ts deprecate ${retire.id} --replacement ${keep.id} --reason "duplicate merge candidate"`,
+          `bun run .floe/memory/scripts/memory.ts link memory ${keep.id} supersedes memory ${retire.id}`,
+          `bun run .floe/memory/scripts/memory.ts save "<merged canonical text>" --record-id ${keep.id}`,
+        ],
+      });
+    }
+  }
+
+  const dedup = new Map<string, Candidate>();
+  for (const c of candidates.sort((a, b) => b.score - a.score)) {
+    const key = [c.keep_id, c.retire_id].sort().join("|");
+    if (!dedup.has(key)) dedup.set(key, c);
+  }
+  const top = Array.from(dedup.values()).sort((a, b) => b.score - a.score).slice(0, limit);
+
+  return {
+    scanned: prepared.length,
+    include_retired: includeRetired,
+    min_score: minScore,
+    count: top.length,
+    candidates: top,
   };
 }
 
@@ -897,7 +1176,9 @@ function expandLinks(
   db: Database,
   hits: SearchResult[],
   linkRelations: string[] | null,
-  linkLimit: number
+  linkLimit: number,
+  retired: Map<string, RetiredMemoryState>,
+  includeRetired: boolean
 ): SearchResult[] {
   // Direct-hit keys — never re-surface a direct result as a linked neighbour
   const directKeys = new Set(hits.map((h) => `${h.type}:${h.id}`));
@@ -909,6 +1190,7 @@ function expandLinks(
   const best = new Map<string, Candidate>();
 
   function consider(entityType: string, entityId: string, relation: string, weight: number, sourceScore: number): void {
+    if (!includeRetired && entityType === "memory" && retired.has(entityId)) return;
     const key = `${entityType}:${entityId}`;
     if (directKeys.has(key)) return;
     const score = computeExpandedScore(sourceScore, relation, weight);
@@ -976,7 +1258,7 @@ function main(): void {
       JSON.stringify({
         ok: false,
         error: "no command provided",
-        usage: "bun run .floe/memory/scripts/memory.ts <save|recall|status|remember|context|link|links|unlink> [args]",
+        usage: "bun run .floe/memory/scripts/memory.ts <save|recall|status|remember|context|deprecate|duplicate-audit|link|links|unlink> [args]",
       })
     );
     process.exit(2);
@@ -1008,6 +1290,12 @@ function main(): void {
       case "context":
         result = cmdContext(db, cleanArgs);
         break;
+      case "deprecate":
+        result = cmdDeprecate(db, cleanArgs);
+        break;
+      case "duplicate-audit":
+        result = cmdDuplicateAudit(db, cleanArgs);
+        break;
       case "link":
         result = cmdLink(db, cleanArgs);
         break;
@@ -1022,7 +1310,7 @@ function main(): void {
           JSON.stringify({
             ok: false,
             error: `unknown command '${command}'`,
-            commands: ["save", "recall", "status", "remember", "context", "link", "links", "unlink"],
+            commands: ["save", "recall", "status", "remember", "context", "deprecate", "duplicate-audit", "link", "links", "unlink"],
           })
         );
         process.exit(2);
