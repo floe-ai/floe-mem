@@ -30,14 +30,25 @@ simple renames, or formatting changes where no prior context could matter.
 
 ## How to invoke
 
-All commands must be run from **this skill's directory**. The scripts use their
-own location to detect the project root and resolve the database path automatically.
+Run the memory runtime from the Floe app install root, not from this duplicated
+skill directory.
+
+Project install path:
 
 ```bash
-bun run scripts/memory.ts <command> [args]
+bun run .floe/memory/scripts/memory.ts <command> [args]
 ```
 
-If you cannot run scripts or the skill directory is not accessible, stop and ask the user.
+Global install path:
+
+```bash
+bun run ~/.floe/memory/scripts/memory.ts <command> [args]
+```
+
+The runtime uses the current working tree first when resolving the active
+project, so the global path still works when you run it from a project root.
+
+If you cannot run the runtime from `.floe/memory`, stop and ask the user.
 
 ## Required workflow
 
@@ -48,20 +59,20 @@ Before reading any project files, search for context relevant to your task.
 **`recall`** is a fast search against saved memories and indexed documents:
 
 ```bash
-bun run scripts/memory.ts recall "your task description"
+bun run .floe/memory/scripts/memory.ts recall "your task description"
 ```
 
 **`context`** runs full discovery and indexing first, then builds a richer bundle — use
 it when onboarding to a project or when `recall` returns thin results:
 
 ```bash
-bun run scripts/memory.ts context "your task description"
+bun run .floe/memory/scripts/memory.ts context "your task description"
 ```
 
 To pull in linked neighbours (memories or documents connected via relationships):
 
 ```bash
-bun run scripts/memory.ts recall "your task description" --expand-links
+bun run .floe/memory/scripts/memory.ts recall "your task description" --expand-links
 ```
 
 Use what you find to inform your approach. Only then proceed to explore files.
@@ -75,15 +86,15 @@ agents can find them. Any file under the project — including artefacts stored
 under `.ai/` — can be indexed:
 
 ```bash
-bun run scripts/memory.ts remember docs/architecture.md src/config.py
+bun run .floe/memory/scripts/memory.ts remember docs/architecture.md src/config.py
 ```
 
 After saving related memories, connect them with a relationship so retrieval
 can surface them together:
 
 ```bash
-bun run scripts/memory.ts link memory <id-a> derived_from document <doc-id>
-bun run scripts/memory.ts link memory <id-a> relates_to memory <id-b>
+bun run .floe/memory/scripts/memory.ts link memory <id-a> derived_from document <doc-id>
+bun run .floe/memory/scripts/memory.ts link memory <id-a> relates_to memory <id-b>
 ```
 
 See the **Relationship types** table below for valid relation names and their
@@ -104,14 +115,14 @@ This is not optional. Before you consider your work complete, write back:
 **How to record it:**
 
 ```bash
-bun run scripts/memory.ts save "Chose JWT with refresh tokens over session cookies. API is stateless across regions." --type decision --tags auth,api
+bun run .floe/memory/scripts/memory.ts save "Chose JWT with refresh tokens over session cookies. API is stateless across regions." --type decision --tags auth,api
 ```
 
 Multiple memories? Save each one:
 
 ```bash
-bun run scripts/memory.ts save "FTS5 requires UNINDEXED for metadata columns" --type learning --tags sqlite,search
-bun run scripts/memory.ts save "text_cache was bloating the DB - read content from disk" --type issue --tags performance
+bun run .floe/memory/scripts/memory.ts save "FTS5 requires UNINDEXED for metadata columns" --type learning --tags sqlite,search
+bun run .floe/memory/scripts/memory.ts save "text_cache was bloating the DB - read content from disk" --type issue --tags performance
 ```
 
 ### What good memory records look like
@@ -127,18 +138,18 @@ Bad records state what happened without explaining why.
 
 ## Quick reference
 
-From the skill directory (this file):
+From the project root:
 
 | Command | What it does |
 |---------|-------------|
-| `bun run scripts/memory.ts recall "<query>"` | Search memory for relevant context |
-| `bun run scripts/memory.ts context "<objective>"` | Build a context bundle for a task |
-| `bun run scripts/memory.ts save "<text>" --type <type> --tags <tags>` | Save a memory |
-| `bun run scripts/memory.ts remember <file> [file...]` | Register and index file(s) |
-| `bun run scripts/memory.ts status` | Show memory overview |
-| `bun run scripts/memory.ts link <src_type> <src_id> <relation> <dst_type> <dst_id>` | Create a relationship |
-| `bun run scripts/memory.ts links <type> <id> [--direction out|in|both]` | Query relationships |
-| `bun run scripts/memory.ts unlink <relationship_id>` | Remove a relationship |
+| `bun run .floe/memory/scripts/memory.ts recall "<query>"` | Search memory for relevant context |
+| `bun run .floe/memory/scripts/memory.ts context "<objective>"` | Build a context bundle for a task |
+| `bun run .floe/memory/scripts/memory.ts save "<text>" --type <type> --tags <tags>` | Save a memory |
+| `bun run .floe/memory/scripts/memory.ts remember <file> [file...]` | Register and index file(s) |
+| `bun run .floe/memory/scripts/memory.ts status` | Show memory overview |
+| `bun run .floe/memory/scripts/memory.ts link <src_type> <src_id> <relation> <dst_type> <dst_id>` | Create a relationship |
+| `bun run .floe/memory/scripts/memory.ts links <type> <id> [--direction out|in|both]` | Query relationships |
+| `bun run .floe/memory/scripts/memory.ts unlink <relationship_id>` | Remove a relationship |
 
 **Relationship flags:** `--weight <n>`, `--meta <json>`, `--relation <name>`, `--limit <n>`
 

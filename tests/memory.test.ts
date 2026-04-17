@@ -1,12 +1,27 @@
 import { expect, test, beforeEach, afterEach } from "bun:test";
-import { mkdtempSync, writeFileSync, rmSync, mkdirSync, existsSync } from "fs";
+import { mkdtempSync, writeFileSync, readFileSync, rmSync, mkdirSync, existsSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
 
-const SCRIPT = join(import.meta.dir, "..", "skills", "context-memory", "scripts", "memory.ts");
+const SCRIPT = join(import.meta.dir, "..", "floe", "runtime", "scripts", "memory.ts");
 
 function runMemory(args: string[], cwd: string): { stdout: string; exitCode: number } {
   const result = Bun.spawnSync(["bun", "run", SCRIPT, ...args], {
+    cwd,
+    env: { ...process.env },
+  });
+  return {
+    stdout: result.stdout.toString(),
+    exitCode: result.exitCode,
+  };
+}
+
+function runInstalledMemory(args: string[], cwd: string): { stdout: string; exitCode: number } {
+  const installedScript = join(cwd, ".floe", "memory", "scripts", "memory.ts");
+  mkdirSync(join(cwd, ".floe", "memory", "scripts"), { recursive: true });
+  writeFileSync(installedScript, readFileSync(SCRIPT, "utf8"), "utf8");
+
+  const result = Bun.spawnSync(["bun", "run", installedScript, ...args], {
     cwd,
     env: { ...process.env },
   });
@@ -84,6 +99,14 @@ test("status shows counts", () => {
   expect(out.ok).toBe(true);
   expect(out.result.memories).toBe(1);
   expect(out.result.recent.length).toBe(1);
+});
+
+test("installed .floe runtime resolves the project root correctly", () => {
+  const { stdout, exitCode } = runInstalledMemory(["status"], tmpDir);
+  const out = parseOutput(stdout);
+  expect(exitCode).toBe(0);
+  expect(out.ok).toBe(true);
+  expect(existsSync(join(tmpDir, ".ai", "memory", "memory.db"))).toBe(true);
 });
 
 test("remember registers and indexes a file", () => {
@@ -255,7 +278,7 @@ test("discovery indexes .ai artefacts but skips .ai/memory", () => {
 
 // ─── Scoring: pure unit tests (direct import) ──────────────────────
 
-import { getRelationFactor, computeExpandedScore } from "../skills/context-memory/scripts/memory.ts";
+import { getRelationFactor, computeExpandedScore } from "../floe/runtime/scripts/memory.ts";
 
 test("getRelationFactor: known relations", () => {
   expect(getRelationFactor("derived_from")).toBe(1.00);
@@ -361,5 +384,3 @@ test("expand-links: spec case G — ranking unchanged without flag", () => {
   // m2 should NOT appear — no --expand-links
   expect(ids).not.toContain(m2);
 });
-
-

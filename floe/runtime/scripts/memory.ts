@@ -3,12 +3,12 @@
  * Self-contained memory service for AI coding agents.
  * Zero external dependencies — uses bun:sqlite (built-in).
  *
- * Usage (run from the skill directory — path to project root is auto-detected):
- *   bun run memory.ts save "We chose JWT for auth" --type decision --tags auth,api
- *   bun run memory.ts recall "authentication"
- *   bun run memory.ts status
- *   bun run memory.ts remember docs/architecture.md
- *   bun run memory.ts context "implement user login"
+ * Usage (run from the installed Floe Memory root or pass the script path directly):
+ *   bun run .floe/memory/scripts/memory.ts save "We chose JWT for auth" --type decision --tags auth,api
+ *   bun run .floe/memory/scripts/memory.ts recall "authentication"
+ *   bun run .floe/memory/scripts/memory.ts status
+ *   bun run .floe/memory/scripts/memory.ts remember docs/architecture.md
+ *   bun run .floe/memory/scripts/memory.ts context "implement user login"
  */
 
 import { Database } from "bun:sqlite";
@@ -19,25 +19,58 @@ import { resolve, dirname, relative } from "path";
 // ─── Configuration ─────────────────────────────────────────────────
 
 /**
- * Resolve the project root. When installed project-locally, the script lives at:
- *   <project-root>/{.agents|.github|.claude}/skills/context-memory/scripts/memory.ts
- * Walk up from the script's directory until we find a folder that contains
- * one of those client directories as a sibling — that folder is the project root.
- * For .git repos we also accept the .git marker.
- * Falls back to process.cwd() for global installs (no client-dir siblings present).
+ * Resolve the active project root.
+ *
+ * Preferred order:
+ * 1. explicit FLOE_MEMORY_PROJECT_ROOT override
+ * 2. the current working tree when the command is run inside a project
+ * 3. the install root that owns .floe/memory for project-local installs
+ * 4. the current working directory as the safest fallback
  */
-function findProjectRoot(): string {
-  const CLIENT_DIRS = [".agents", ".github", ".claude"];
-  let dir = import.meta.dir;
-  for (let i = 0; i < 20; i++) {
-    if (
-      existsSync(resolve(dir, ".git")) ||
-      CLIENT_DIRS.some((d) => existsSync(resolve(dir, d)))
-    ) return dir;
+const WORKSPACE_MARKERS = [".git", ".agents", ".github", ".claude"];
+
+function findWorkspaceRoot(start: string): string | null {
+  let dir = resolve(start);
+  for (let i = 0; i < 20; i += 1) {
+    if (WORKSPACE_MARKERS.some((entry) => existsSync(resolve(dir, entry)))) {
+      return dir;
+    }
+
     const parent = resolve(dir, "..");
     if (parent === dir) break;
     dir = parent;
   }
+
+  return null;
+}
+
+function findInstalledRoot(start: string): string | null {
+  let dir = resolve(start);
+  for (let i = 0; i < 20; i += 1) {
+    if (existsSync(resolve(dir, ".floe", "memory"))) {
+      return dir;
+    }
+
+    const parent = resolve(dir, "..");
+    if (parent === dir) break;
+    dir = parent;
+  }
+
+  return null;
+}
+
+function findProjectRoot(): string {
+  const explicitRoot = process.env.FLOE_MEMORY_PROJECT_ROOT;
+  if (explicitRoot?.trim()) {
+    return resolve(explicitRoot);
+  }
+
+  const cwdRoot = findWorkspaceRoot(process.cwd());
+  if (cwdRoot) return cwdRoot;
+
+  const installedRoot = findInstalledRoot(import.meta.dir);
+  if (installedRoot) return installedRoot;
+
   return process.cwd();
 }
 
@@ -943,7 +976,7 @@ function main(): void {
       JSON.stringify({
         ok: false,
         error: "no command provided",
-        usage: "bun run scripts/memory.ts <save|recall|status|remember|context|link|links|unlink> [args]",
+        usage: "bun run .floe/memory/scripts/memory.ts <save|recall|status|remember|context|link|links|unlink> [args]",
       })
     );
     process.exit(2);

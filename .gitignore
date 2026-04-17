@@ -1,9 +1,12 @@
 # Python
 __pycache__/
 *.py[cod]
+node_modules/
 
 # Local memory runtime artifacts
 .ai/
+.venv/
+dist/
 *.db
 *.sqlite
 *.sqlite3

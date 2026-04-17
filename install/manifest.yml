@@ -1,0 +1,91 @@
+app:
+  id: floe-mem
+  name: Floe Memory
+  appRoot: memory
+
+defaults:
+  installRoot: .floe
+  mode: project
+
+prerequisites:
+  - id: bun
+    displayName: Bun
+    command: bun
+    minVersion: "1.3.0"
+    instructions:
+      default: Install Bun from https://bun.sh before installing Floe Memory.
+
+modes:
+  project:
+    targets:
+      - id: codex
+        label: Codex
+        description: Copy the Context Memory skill into .agents/skills/context-memory
+      - id: copilot
+        label: Copilot
+        description: Copy the Context Memory skill into .github/skills/context-memory
+      - id: claude
+        label: Claude
+        description: Copy the Context Memory skill into .claude/skills/context-memory
+  global:
+    targets:
+      - id: codex
+        label: Codex
+        description: Copy the Context Memory skill into ~/.agents/skills/context-memory
+      - id: copilot
+        label: Copilot
+        description: Copy the Context Memory skill into ~/.github/skills/context-memory
+      - id: claude
+        label: Claude
+        description: Copy the Context Memory skill into ~/.claude/skills/context-memory
+
+mappings:
+  - from: runtime
+    to: .
+
+  - from: skills/context-memory/SKILL.md
+    to: .agents/skills/context-memory/SKILL.md
+    destRoot: projectRoot
+    modes: project
+    targets: [codex]
+
+  - from: skills/context-memory/SKILL.md
+    to: .github/skills/context-memory/SKILL.md
+    destRoot: projectRoot
+    modes: project
+    targets: [copilot]
+
+  - from: skills/context-memory/SKILL.md
+    to: .claude/skills/context-memory/SKILL.md
+    destRoot: projectRoot
+    modes: project
+    targets: [claude]
+
+  - from: skills/context-memory/SKILL.md
+    to: .agents/skills/context-memory/SKILL.md
+    destRoot: home
+    modes: global
+    targets: [codex]
+
+  - from: skills/context-memory/SKILL.md
+    to: .github/skills/context-memory/SKILL.md
+    destRoot: home
+    modes: global
+    targets: [copilot]
+
+  - from: skills/context-memory/SKILL.md
+    to: .claude/skills/context-memory/SKILL.md
+    destRoot: home
+    modes: global
+    targets: [claude]
+
+prompts:
+  intro: Bootstrap Floe Memory
+  confirm: Install Floe Memory into the selected Floe and agent surfaces?
+  completion: Floe Memory installed.
+
+outputs:
+  successMessage: Floe Memory installed.
+  nextSteps:
+    - "Project install: bun run .floe/memory/scripts/memory.ts status"
+    - "Global install: bun run ~/.floe/memory/scripts/memory.ts status"

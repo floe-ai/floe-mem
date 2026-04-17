@@ -1,60 +1,78 @@
-# Repo-Local Memory Service
+# Floe Memory
 
-Standalone, database-backed memory continuity for coding agents.
-Canonical project docs stay in-place; memory stores derived retrieval state.
+Repo-local memory continuity for coding agents, installed through the shared
+`floe-boot` bootstrap flow.
 
 ## Prerequisites
 
 Install [Bun](https://bun.sh):
+
 ```bash
 curl -fsSL https://bun.sh/install | bash
 ```
 
-```iex
+```powershell
 powershell -c "irm bun.sh/install.ps1 | iex"
 ```
 
-## One-command install
+## Install
+
+Primary install command:
 
 ```bash
-bunx github:floe-ai/floe-mem
+bunx github:floe-ai/floe-mem --target codex,copilot
 ```
 
-The guided installer prompts for:
-- target clients (`Codex`, `Copilot`, `Claude`)
-- confirmation of resolved install paths
+This installs:
 
-It copies `SKILL.md` + `scripts/memory.ts` into `<project-root>/{.agents|.github|.claude}/skills/context-memory/`. Run it from your **project root**.
+- the canonical runtime into `.floe/memory/`
+- duplicated agent skill markdown into any selected targets under `.agents/`, `.github/`, and `.claude/`
 
-**CLI flags (skip prompts):**
+Useful flags:
+
 ```bash
-bunx github:floe-ai/floe-mem --target codex,copilot --yes
+bunx github:floe-ai/floe-mem --mode project --target codex --yes
+bunx github:floe-ai/floe-mem --mode global --target codex --target claude --yes
 ```
 
-**Local install (from cloned repo):**
+Local repo usage:
+
 ```bash
-bun run scripts/install.ts --target codex --scope project --yes
+bun run install:bootstrap --target codex --yes
 ```
 
-## Memory commands
+## Memory Commands
 
-All commands run from the project root:
+From a project root, run:
+
+```bash
+bun run .floe/memory/scripts/memory.ts <command> [args]
+```
+
+Common commands:
 
 | Command | What it does |
 |---------|-------------|
-| `bun run scripts/memory.ts recall "<query>"` | Search memory for relevant context |
-| `bun run scripts/memory.ts context "<objective>"` | Build a context bundle for a task |
-| `bun run scripts/memory.ts save "<text>" --type <type> --tags <tags>` | Save a memory |
-| `bun run scripts/memory.ts remember <file> [file...]` | Register and index file(s) |
-| `bun run scripts/memory.ts status` | Show memory overview |
+| `bun run .floe/memory/scripts/memory.ts recall "<query>"` | Search memory for relevant context |
+| `bun run .floe/memory/scripts/memory.ts context "<objective>"` | Build a context bundle for a task |
+| `bun run .floe/memory/scripts/memory.ts save "<text>" --type <type> --tags <tags>` | Save a memory |
+| `bun run .floe/memory/scripts/memory.ts remember <file> [file...]` | Register and index file(s) |
+| `bun run .floe/memory/scripts/memory.ts status` | Show memory overview |
 
 Memory types: `decision`, `pattern`, `issue`, `learning`, `preference`, `constraint`.
 
-## Runtime model
+For a global install, use:
 
-- `scripts/memory.ts` is a self-contained script using `bun:sqlite` (zero external deps).
-- The memory database lives at `.ai/memory/memory.db` (gitignored).
-- The installer (`scripts/install.ts`) is also a self-contained Bun script.
+```bash
+bun run ~/.floe/memory/scripts/memory.ts <command> [args]
+```
+
+## Runtime Model
+
+- Canonical shipped files live under `floe/`.
+- The installed runtime lives under `.floe/memory/`.
+- Agent-facing `SKILL.md` files are duplicated into the selected dotfolders.
+- The memory database lives at `.ai/memory/memory.db` in the active project root.
 
 ## Tests
 

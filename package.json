@@ -1,14 +1,21 @@
 {
   "name": "floe-mem",
   "version": "0.2.0",
-  "description": "Pluggable memory skill for AI coding agents",
+  "description": "Floe memory runtime and agent skill installer",
   "bin": {
-    "floe-mem": "scripts/install.ts"
+    "floe-mem": "install/floe-mem.mjs"
   },
   "files": [
-    "scripts/",
-    "skills/"
+    "floe/",
+    "install/"
   ],
+  "scripts": {
+    "install:bootstrap": "node ./install/floe-mem.mjs",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "floe-boot": "git+https://github.com/floe-ai/floe-boot.git"
+  },
   "keywords": ["ai", "agent", "memory", "skill", "codex", "copilot", "claude"],
   "license": "MIT",
   "repository": {
