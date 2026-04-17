@@ -35,7 +35,8 @@ async function main() {
   }
 
   const args = ["--project-root", initCwd];
-  if (!process.stdout.isTTY) {
+  // Default to interactive bootstrap; callers can force non-interactive mode.
+  if (process.env.FLOE_MEM_NON_INTERACTIVE === "1") {
     args.push("--non-interactive");
   }
 

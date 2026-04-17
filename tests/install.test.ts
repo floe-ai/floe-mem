@@ -235,7 +235,7 @@ describe("floe-mem installer", () => {
       cwd: packageRoot,
       stdout: "pipe",
       stderr: "pipe",
-      env: { ...process.env, INIT_CWD: consumerRoot },
+      env: { ...process.env, INIT_CWD: consumerRoot, FLOE_MEM_NON_INTERACTIVE: "1" },
     });
     const [, stderr, exitCode] = await Promise.all([
       new Response(proc.stdout).text(),

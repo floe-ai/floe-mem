@@ -34,6 +34,9 @@ This installs:
 - the canonical runtime into `.floe/memory/`
 - duplicated agent skill markdown into the selected targets under `.agents/`, `.github/`, and `.claude/`
 
+By default, postinstall bootstrapping is interactive when prompts are available.
+Set `FLOE_MEM_NON_INTERACTIVE=1` to force non-interactive bootstrap in CI or scripts.
+
 When you install from an interactive terminal, the installer prompts for target
 selection. If you omit `--target` in non-interactive mode, all supported
 targets for the selected mode are installed.
