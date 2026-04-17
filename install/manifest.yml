@@ -20,61 +20,61 @@ modes:
     targets:
       - id: codex
         label: Codex
-        description: Copy the Context Memory skill into .agents/skills/context-memory
+        description: Copy the Floe Memory skill into .agents/skills/floe-memory
       - id: copilot
         label: Copilot
-        description: Copy the Context Memory skill into .github/skills/context-memory
+        description: Copy the Floe Memory skill into .github/skills/floe-memory
       - id: claude
         label: Claude
-        description: Copy the Context Memory skill into .claude/skills/context-memory
+        description: Copy the Floe Memory skill into .claude/skills/floe-memory
   global:
     targets:
       - id: codex
         label: Codex
-        description: Copy the Context Memory skill into ~/.agents/skills/context-memory
+        description: Copy the Floe Memory skill into ~/.agents/skills/floe-memory
       - id: copilot
         label: Copilot
-        description: Copy the Context Memory skill into ~/.github/skills/context-memory
+        description: Copy the Floe Memory skill into ~/.github/skills/floe-memory
       - id: claude
         label: Claude
-        description: Copy the Context Memory skill into ~/.claude/skills/context-memory
+        description: Copy the Floe Memory skill into ~/.claude/skills/floe-memory
 
 mappings:
   - from: runtime
     to: .
 
-  - from: skills/context-memory/SKILL.md
-    to: .agents/skills/context-memory/SKILL.md
+  - from: skills/floe-memory/SKILL.md
+    to: .agents/skills/floe-memory/SKILL.md
     destRoot: projectRoot
     modes: project
     targets: [codex]
 
-  - from: skills/context-memory/SKILL.md
-    to: .github/skills/context-memory/SKILL.md
+  - from: skills/floe-memory/SKILL.md
+    to: .github/skills/floe-memory/SKILL.md
     destRoot: projectRoot
     modes: project
     targets: [copilot]
 
-  - from: skills/context-memory/SKILL.md
-    to: .claude/skills/context-memory/SKILL.md
+  - from: skills/floe-memory/SKILL.md
+    to: .claude/skills/floe-memory/SKILL.md
     destRoot: projectRoot
     modes: project
     targets: [claude]
 
-  - from: skills/context-memory/SKILL.md
-    to: .agents/skills/context-memory/SKILL.md
+  - from: skills/floe-memory/SKILL.md
+    to: .agents/skills/floe-memory/SKILL.md
     destRoot: home
     modes: global
     targets: [codex]
 
-  - from: skills/context-memory/SKILL.md
-    to: .github/skills/context-memory/SKILL.md
+  - from: skills/floe-memory/SKILL.md
+    to: .github/skills/floe-memory/SKILL.md
     destRoot: home
     modes: global
     targets: [copilot]
 
-  - from: skills/context-memory/SKILL.md
-    to: .claude/skills/context-memory/SKILL.md
+  - from: skills/floe-memory/SKILL.md
+    to: .claude/skills/floe-memory/SKILL.md
     destRoot: home
     modes: global
     targets: [claude]

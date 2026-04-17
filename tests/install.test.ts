@@ -98,9 +98,9 @@ describe("floe-mem installer", () => {
     expect(exitCode).toBe(0);
     expect(stderr).toBe("");
     expect(existsSync(join(root, ".floe", "memory", "scripts", "memory.ts"))).toBe(true);
-    expect(existsSync(join(root, ".agents", "skills", "context-memory", "SKILL.md"))).toBe(true);
-    expect(existsSync(join(root, ".github", "skills", "context-memory", "SKILL.md"))).toBe(false);
-    expect(existsSync(join(root, ".claude", "skills", "context-memory", "SKILL.md"))).toBe(false);
+    expect(existsSync(join(root, ".agents", "skills", "floe-memory", "SKILL.md"))).toBe(true);
+    expect(existsSync(join(root, ".github", "skills", "floe-memory", "SKILL.md"))).toBe(false);
+    expect(existsSync(join(root, ".claude", "skills", "floe-memory", "SKILL.md"))).toBe(false);
   });
 
   it("installs all targets when --target is omitted", async () => {
@@ -116,9 +116,9 @@ describe("floe-mem installer", () => {
 
     expect(exitCode).toBe(0);
     expect(existsSync(join(root, ".floe", "memory", "scripts", "memory.ts"))).toBe(true);
-    expect(existsSync(join(root, ".agents", "skills", "context-memory", "SKILL.md"))).toBe(true);
-    expect(existsSync(join(root, ".github", "skills", "context-memory", "SKILL.md"))).toBe(true);
-    expect(existsSync(join(root, ".claude", "skills", "context-memory", "SKILL.md"))).toBe(true);
+    expect(existsSync(join(root, ".agents", "skills", "floe-memory", "SKILL.md"))).toBe(true);
+    expect(existsSync(join(root, ".github", "skills", "floe-memory", "SKILL.md"))).toBe(true);
+    expect(existsSync(join(root, ".claude", "skills", "floe-memory", "SKILL.md"))).toBe(true);
   });
 
   it("uses INIT_CWD as the default project root when none is passed", async () => {
@@ -133,7 +133,7 @@ describe("floe-mem installer", () => {
 
     expect(exitCode).toBe(0);
     expect(existsSync(join(root, ".floe", "memory", "scripts", "memory.ts"))).toBe(true);
-    expect(existsSync(join(root, ".agents", "skills", "context-memory", "SKILL.md"))).toBe(true);
+    expect(existsSync(join(root, ".agents", "skills", "floe-memory", "SKILL.md"))).toBe(true);
   });
 
   it("copies skill markdown that points agents at the canonical runtime", async () => {
@@ -149,9 +149,9 @@ describe("floe-mem installer", () => {
     ]);
 
     expect(exitCode).toBe(0);
-    const skill = readFileSync(join(root, ".agents", "skills", "context-memory", "SKILL.md"), "utf8");
+    const skill = readFileSync(join(root, ".agents", "skills", "floe-memory", "SKILL.md"), "utf8");
     expect(skill).toContain(".floe/memory/scripts/memory.ts");
-    expect(existsSync(join(root, ".agents", "skills", "context-memory", "scripts", "memory.ts"))).toBe(false);
+    expect(existsSync(join(root, ".agents", "skills", "floe-memory", "scripts", "memory.ts"))).toBe(false);
   });
 
   it("fails if the install already exists without --force", async () => {
@@ -218,9 +218,9 @@ describe("floe-mem installer", () => {
 
     expect(exitCode).toBe(0);
     expect(existsSync(join(home, ".floe", "memory", "scripts", "memory.ts"))).toBe(true);
-    expect(existsSync(join(home, ".agents", "skills", "context-memory", "SKILL.md"))).toBe(true);
-    expect(existsSync(join(home, ".claude", "skills", "context-memory", "SKILL.md"))).toBe(true);
-    expect(existsSync(join(home, ".github", "skills", "context-memory", "SKILL.md"))).toBe(false);
+    expect(existsSync(join(home, ".agents", "skills", "floe-memory", "SKILL.md"))).toBe(true);
+    expect(existsSync(join(home, ".claude", "skills", "floe-memory", "SKILL.md"))).toBe(true);
+    expect(existsSync(join(home, ".github", "skills", "floe-memory", "SKILL.md"))).toBe(false);
     expect(existsSync(join(projectRoot, ".floe", "memory"))).toBe(false);
   });
 
@@ -246,8 +246,8 @@ describe("floe-mem installer", () => {
     expect(exitCode).toBe(0);
     expect(stderr).toBe("");
     expect(existsSync(join(consumerRoot, ".floe", "memory", "scripts", "memory.ts"))).toBe(true);
-    expect(existsSync(join(consumerRoot, ".agents", "skills", "context-memory", "SKILL.md"))).toBe(true);
-    expect(existsSync(join(consumerRoot, ".github", "skills", "context-memory", "SKILL.md"))).toBe(true);
-    expect(existsSync(join(consumerRoot, ".claude", "skills", "context-memory", "SKILL.md"))).toBe(true);
+    expect(existsSync(join(consumerRoot, ".agents", "skills", "floe-memory", "SKILL.md"))).toBe(true);
+    expect(existsSync(join(consumerRoot, ".github", "skills", "floe-memory", "SKILL.md"))).toBe(true);
+    expect(existsSync(join(consumerRoot, ".claude", "skills", "floe-memory", "SKILL.md"))).toBe(true);
   });
 });
