@@ -20,13 +20,13 @@ powershell -c "irm bun.sh/install.ps1 | iex"
 Primary install command:
 
 ```bash
-bunx github:floe-ai/floe-mem
+npm install --no-save git+https://github.com/floe-ai/floe-mem.git
 ```
 
 Package-manager install:
 
 ```bash
-npm install git+github:floe-ai/floe-mem
+npm install git+https://github.com/floe-ai/floe-mem.git
 ```
 
 This installs:
@@ -41,8 +41,8 @@ targets for the selected mode are installed.
 Useful flags:
 
 ```bash
-bunx github:floe-ai/floe-mem --mode project --target codex --yes
-bunx github:floe-ai/floe-mem --mode global --target codex --target claude --yes
+npx floe-mem --mode project --target codex --yes
+npx floe-mem --mode global --target codex --target claude --yes
 ```
 
 Local repo usage:
