@@ -4,7 +4,6 @@ __pycache__/
 node_modules/
 
 # Local memory runtime artifacts
-.ai/
 .venv/
 dist/
 *.db

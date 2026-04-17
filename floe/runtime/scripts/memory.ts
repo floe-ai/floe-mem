@@ -75,7 +75,7 @@ function findProjectRoot(): string {
 }
 
 const REPO_ROOT = findProjectRoot();
-const DB_PATH = resolve(REPO_ROOT, ".ai/memory/memory.db");
+const DB_PATH = resolve(REPO_ROOT, ".floe/memory/memory.db");
 const SCHEMA_VERSION = 3;
 
 // ─── Database ──────────────────────────────────────────────────────
@@ -487,10 +487,10 @@ function discoverFiles(db: Database): number {
   for (const path of glob.scanSync({ cwd: root, dot: false })) {
     if (count >= MAX_DISCOVER) break;
 
-    // Skip unwanted directories and .ai/memory (internal storage)
+    // Skip unwanted directories and the floe-mem runtime state.
     const parts = path.split("/");
     if (parts.some((p) => SKIP_DIRS.has(p))) continue;
-    if (path.startsWith(".ai/memory/") || path === ".ai/memory") continue;
+    if (path.startsWith(".floe/memory/") || path === ".floe/memory") continue;
 
     const absPath = resolve(root, path);
     try {

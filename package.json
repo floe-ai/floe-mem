@@ -11,6 +11,7 @@
   ],
   "scripts": {
     "install:bootstrap": "node ./install/floe-mem.mjs",
+    "postinstall": "node ./install/postinstall.mjs",
     "test": "bun test"
   },
   "dependencies": {

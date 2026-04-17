@@ -62,7 +62,7 @@ test("unknown command returns error", () => {
 });
 
 test("save creates a memory", () => {
-  const dbPath = join(tmpDir, ".ai", "memory", "memory.db");
+  const dbPath = join(tmpDir, ".floe", "memory", "memory.db");
   const { stdout, exitCode } = runMemory(
     ["save", "We chose JWT for auth", "--type", "decision", "--tags", "auth,api", "--db", dbPath],
     tmpDir
@@ -76,7 +76,7 @@ test("save creates a memory", () => {
 });
 
 test("recall finds saved memories", () => {
-  const dbPath = join(tmpDir, ".ai", "memory", "memory.db");
+  const dbPath = join(tmpDir, ".floe", "memory", "memory.db");
   // Save first
   runMemory(["save", "JWT authentication with refresh tokens", "--type", "decision", "--db", dbPath], tmpDir);
 
@@ -90,7 +90,7 @@ test("recall finds saved memories", () => {
 });
 
 test("status shows counts", () => {
-  const dbPath = join(tmpDir, ".ai", "memory", "memory.db");
+  const dbPath = join(tmpDir, ".floe", "memory", "memory.db");
   runMemory(["save", "test memory", "--db", dbPath], tmpDir);
 
   const { stdout, exitCode } = runMemory(["status", "--db", dbPath], tmpDir);
@@ -106,11 +106,11 @@ test("installed .floe runtime resolves the project root correctly", () => {
   const out = parseOutput(stdout);
   expect(exitCode).toBe(0);
   expect(out.ok).toBe(true);
-  expect(existsSync(join(tmpDir, ".ai", "memory", "memory.db"))).toBe(true);
+  expect(existsSync(join(tmpDir, ".floe", "memory", "memory.db"))).toBe(true);
 });
 
 test("remember registers and indexes a file", () => {
-  const dbPath = join(tmpDir, ".ai", "memory", "memory.db");
+  const dbPath = join(tmpDir, ".floe", "memory", "memory.db");
   const docsDir = join(tmpDir, "docs");
   mkdirSync(docsDir, { recursive: true });
   writeFileSync(join(docsDir, "note.md"), "# Note\n\nHello memory");
@@ -125,7 +125,7 @@ test("remember registers and indexes a file", () => {
 });
 
 test("context builds a bundle", () => {
-  const dbPath = join(tmpDir, ".ai", "memory", "memory.db");
+  const dbPath = join(tmpDir, ".floe", "memory", "memory.db");
   runMemory(["save", "Authentication uses JWT tokens", "--type", "decision", "--db", dbPath], tmpDir);
 
   const { stdout, exitCode } = runMemory(["context", "authentication", "--db", dbPath], tmpDir);
@@ -138,7 +138,7 @@ test("context builds a bundle", () => {
 });
 
 test("save with --record-id updates existing", () => {
-  const dbPath = join(tmpDir, ".ai", "memory", "memory.db");
+  const dbPath = join(tmpDir, ".floe", "memory", "memory.db");
   const save1 = parseOutput(
     runMemory(["save", "original content", "--type", "learning", "--db", dbPath], tmpDir).stdout
   );
@@ -153,7 +153,7 @@ test("save with --record-id updates existing", () => {
 });
 
 test("save without content returns error", () => {
-  const dbPath = join(tmpDir, ".ai", "memory", "memory.db");
+  const dbPath = join(tmpDir, ".floe", "memory", "memory.db");
   const { stdout, exitCode } = runMemory(["save", "--db", dbPath], tmpDir);
   // --db gets consumed as content (it's positional), but the actual error
   // depends on parsing — just check it doesn't crash silently
@@ -163,7 +163,7 @@ test("save without content returns error", () => {
 // ─── Relationship commands ──────────────────────────────────────────
 
 test("link creates a relationship between two memories", () => {
-  const dbPath = join(tmpDir, ".ai", "memory", "memory.db");
+  const dbPath = join(tmpDir, ".floe", "memory", "memory.db");
 
   const m1 = parseOutput(runMemory(["save", "decision A", "--type", "decision", "--db", dbPath], tmpDir).stdout);
   const m2 = parseOutput(runMemory(["save", "decision B", "--type", "decision", "--db", dbPath], tmpDir).stdout);
@@ -182,7 +182,7 @@ test("link creates a relationship between two memories", () => {
 });
 
 test("link is idempotent — second link updates", () => {
-  const dbPath = join(tmpDir, ".ai", "memory", "memory.db");
+  const dbPath = join(tmpDir, ".floe", "memory", "memory.db");
   const m1 = parseOutput(runMemory(["save", "A", "--db", dbPath], tmpDir).stdout).result.saved;
   const m2 = parseOutput(runMemory(["save", "B", "--db", dbPath], tmpDir).stdout).result.saved;
 
@@ -194,7 +194,7 @@ test("link is idempotent — second link updates", () => {
 });
 
 test("link rejects unknown source entity", () => {
-  const dbPath = join(tmpDir, ".ai", "memory", "memory.db");
+  const dbPath = join(tmpDir, ".floe", "memory", "memory.db");
   const m = parseOutput(runMemory(["save", "real memory", "--db", dbPath], tmpDir).stdout).result.saved;
   const { stdout, exitCode } = runMemory(
     ["link", "memory", "mem_doesnotexist", "relates_to", "memory", m, "--db", dbPath],
@@ -207,7 +207,7 @@ test("link rejects unknown source entity", () => {
 });
 
 test("links returns neighbours", () => {
-  const dbPath = join(tmpDir, ".ai", "memory", "memory.db");
+  const dbPath = join(tmpDir, ".floe", "memory", "memory.db");
   const m1 = parseOutput(runMemory(["save", "A", "--db", dbPath], tmpDir).stdout).result.saved;
   const m2 = parseOutput(runMemory(["save", "B", "--db", dbPath], tmpDir).stdout).result.saved;
   runMemory(["link", "memory", m1, "derived_from", "memory", m2, "--db", dbPath], tmpDir);
@@ -222,7 +222,7 @@ test("links returns neighbours", () => {
 });
 
 test("unlink removes a relationship", () => {
-  const dbPath = join(tmpDir, ".ai", "memory", "memory.db");
+  const dbPath = join(tmpDir, ".floe", "memory", "memory.db");
   const m1 = parseOutput(runMemory(["save", "A", "--db", dbPath], tmpDir).stdout).result.saved;
   const m2 = parseOutput(runMemory(["save", "B", "--db", dbPath], tmpDir).stdout).result.saved;
   const relId = parseOutput(
@@ -241,7 +241,7 @@ test("unlink removes a relationship", () => {
 });
 
 test("recall --expand-links returns linked neighbours", () => {
-  const dbPath = join(tmpDir, ".ai", "memory", "memory.db");
+  const dbPath = join(tmpDir, ".floe", "memory", "memory.db");
   const m1 = parseOutput(runMemory(["save", "typescript bun rewrite decision", "--type", "decision", "--db", dbPath], tmpDir).stdout).result.saved;
   const m2 = parseOutput(runMemory(["save", "unrelated other memory", "--type", "learning", "--db", dbPath], tmpDir).stdout).result.saved;
   runMemory(["link", "memory", m1, "relates_to", "memory", m2, "--db", dbPath], tmpDir);
@@ -257,23 +257,22 @@ test("recall --expand-links returns linked neighbours", () => {
   expect(neighbour.tier).toBe("linked");
 });
 
-// ─── Discovery: .ai refinement ─────────────────────────────────────
+// ─── Discovery: .floe runtime isolation ────────────────────────────
 
-test("discovery indexes .ai artefacts but skips .ai/memory", () => {
-  const dbPath = join(tmpDir, ".ai", "memory", "memory.db");
-  // Create a .ai/docs file that should be discoverable
-  mkdirSync(join(tmpDir, ".ai", "docs"), { recursive: true });
-  writeFileSync(join(tmpDir, ".ai", "docs", "notes.md"), "# Notes\n\nSome content here.");
-  // Create .ai/memory dir and a file inside that should be skipped
-  mkdirSync(join(tmpDir, ".ai", "memory"), { recursive: true });
-  writeFileSync(join(tmpDir, ".ai", "memory", "internal.txt"), "internal state");
+test("discovery skips floe-mem runtime state under .floe/memory", () => {
+  const dbPath = join(tmpDir, ".floe", "memory", "memory.db");
+  mkdirSync(join(tmpDir, "docs"), { recursive: true });
+  writeFileSync(join(tmpDir, "docs", "note.md"), "# Note\n\nHello memory");
+  mkdirSync(join(tmpDir, ".floe", "memory"), { recursive: true });
+  writeFileSync(join(tmpDir, ".floe", "memory", "internal.txt"), "internal state");
 
   const out = parseOutput(
-    runMemory(["remember", ".ai/docs/notes.md", "--db", dbPath], tmpDir).stdout
+    runMemory(["remember", "docs/note.md", "--db", dbPath], tmpDir).stdout
   );
   expect(out.ok).toBe(true);
   expect(out.result.registered.length).toBe(1);
-  expect(out.result.registered[0].file).toContain("notes.md");
+  expect(out.result.registered[0].file).toBe("docs/note.md");
+  expect(out.result.indexed.documents).toBe(1);
 });
 
 // ─── Scoring: pure unit tests (direct import) ──────────────────────
@@ -346,7 +345,7 @@ test("computeExpandedScore: invalid edge weight defaults to 1.0", () => {
 
 // Spec test F: dedup — same linked entity from two source hits → one result, highest score
 test("expand-links dedup: spec case F — highest score wins across source hits", () => {
-  const dbPath = join(tmpDir, ".ai", "memory", "memory.db");
+  const dbPath = join(tmpDir, ".floe", "memory", "memory.db");
 
   // Two source memories with different scores via different search tiers
   const high = parseOutput(runMemory(["save", "exact match target high score", "--type", "decision", "--db", dbPath], tmpDir).stdout).result.saved;
@@ -374,7 +373,7 @@ test("expand-links dedup: spec case F — highest score wins across source hits"
 
 // Spec test G: no behaviour change without --expand-links
 test("expand-links: spec case G — ranking unchanged without flag", () => {
-  const dbPath = join(tmpDir, ".ai", "memory", "memory.db");
+  const dbPath = join(tmpDir, ".floe", "memory", "memory.db");
   const m1 = parseOutput(runMemory(["save", "baseline memory", "--type", "learning", "--db", dbPath], tmpDir).stdout).result.saved;
   const m2 = parseOutput(runMemory(["save", "linked other",    "--type", "learning", "--db", dbPath], tmpDir).stdout).result.saved;
   runMemory(["link", "memory", m1, "relates_to", "memory", m2, "--db", dbPath], tmpDir);

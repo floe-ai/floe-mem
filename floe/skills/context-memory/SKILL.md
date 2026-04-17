@@ -82,8 +82,8 @@ Use what you find to inform your approach. Only then proceed to explore files.
 Proceed with the task, informed by the memory context you retrieved.
 
 If you discover important documents during your work, register them so future
-agents can find them. Any file under the project — including artefacts stored
-under `.ai/` — can be indexed:
+agents can find them. Any project file outside Floe Memory's own runtime state
+can be indexed:
 
 ```bash
 bun run .floe/memory/scripts/memory.ts remember docs/architecture.md src/config.py
@@ -190,4 +190,4 @@ closer to the source hit's score.
 - **Write before you finish.** Every task that produces knowledge should leave a memory record.
 - Keep records concise but complete — capture decisions, reasoning, and constraints.
 - All file references in memory are relative paths from the project root.
-- The memory database is created automatically at project root under `.ai/memory/memory.db` and is gitignored.
+- The memory database is created automatically at project root under `.floe/memory/memory.db`.

@@ -24,10 +24,25 @@ function normalizeArgs(argv) {
   return normalized;
 }
 
-async function run() {
+function applyDefaultProjectRoot(argv, env) {
+  if (argv.includes("--project-root")) {
+    return argv;
+  }
+
+  const initCwd = env.INIT_CWD?.trim();
+  if (!initCwd) {
+    return argv;
+  }
+
+  return ["--project-root", resolve(initCwd), ...argv];
+}
+
+export async function run(argv = process.argv.slice(2), env = process.env) {
   const manifestPath = resolve(dirname(fileURLToPath(import.meta.url)), "manifest.yml");
-  const argv = normalizeArgs(process.argv.slice(2));
-  const args = argv.includes("--manifest") ? argv : ["--manifest", manifestPath, ...argv];
+  const normalizedArgv = applyDefaultProjectRoot(normalizeArgs(argv), env);
+  const args = normalizedArgv.includes("--manifest")
+    ? normalizedArgv
+    : ["--manifest", manifestPath, ...normalizedArgv];
 
   let main;
   try {
@@ -48,4 +63,6 @@ async function run() {
   }
 }
 
-run();
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  run();
+}

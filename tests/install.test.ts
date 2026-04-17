@@ -1,11 +1,12 @@
 import { describe, it, expect, afterEach } from "bun:test";
-import { existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { randomBytes } from "node:crypto";
 
 const REPO_ROOT = join(import.meta.dir, "..");
 const INSTALLER = join(REPO_ROOT, "install", "floe-mem.mjs");
+const POSTINSTALL = join(REPO_ROOT, "install", "postinstall.mjs");
 
 function tempDir(): string {
   return join(tmpdir(), `floe-install-test-${randomBytes(6).toString("hex")}`);
@@ -27,6 +28,49 @@ async function runInstaller(args: string[], env?: Record<string, string>): Promi
     proc.exited,
   ]);
   return { stdout, stderr, exitCode };
+}
+
+async function runPostinstall(env?: Record<string, string>): Promise<{
+  stdout: string;
+  stderr: string;
+  exitCode: number | null;
+}> {
+  const proc = Bun.spawn(["bun", POSTINSTALL], {
+    stdout: "pipe",
+    stderr: "pipe",
+    env: { ...process.env, ...env },
+  });
+  const [stdout, stderr, exitCode] = await Promise.all([
+    new Response(proc.stdout).text(),
+    new Response(proc.stderr).text(),
+    proc.exited,
+  ]);
+  return { stdout, stderr, exitCode };
+}
+
+function stageDependencyInstall(root: string): string {
+  const packageRoot = join(root, "node_modules", "floe-mem");
+  mkdirSync(join(root, "node_modules"), { recursive: true });
+  mkdirSync(packageRoot, { recursive: true });
+  cpSync(join(REPO_ROOT, "package.json"), join(packageRoot, "package.json"), { force: true });
+  cpSync(join(REPO_ROOT, "install"), join(packageRoot, "install"), { recursive: true });
+  cpSync(join(REPO_ROOT, "floe"), join(packageRoot, "floe"), { recursive: true });
+  cpSync(join(REPO_ROOT, "node_modules", "floe-boot"), join(root, "node_modules", "floe-boot"), {
+    recursive: true,
+  });
+  cpSync(join(REPO_ROOT, "node_modules", "yaml"), join(root, "node_modules", "yaml"), {
+    recursive: true,
+  });
+  cpSync(join(REPO_ROOT, "node_modules", "@clack"), join(root, "node_modules", "@clack"), {
+    recursive: true,
+  });
+  cpSync(join(REPO_ROOT, "node_modules", "picocolors"), join(root, "node_modules", "picocolors"), {
+    recursive: true,
+  });
+  cpSync(join(REPO_ROOT, "node_modules", "sisteransi"), join(root, "node_modules", "sisteransi"), {
+    recursive: true,
+  });
+  return packageRoot;
 }
 
 describe("floe-mem installer", () => {
@@ -75,6 +119,21 @@ describe("floe-mem installer", () => {
     expect(existsSync(join(root, ".agents", "skills", "context-memory", "SKILL.md"))).toBe(true);
     expect(existsSync(join(root, ".github", "skills", "context-memory", "SKILL.md"))).toBe(true);
     expect(existsSync(join(root, ".claude", "skills", "context-memory", "SKILL.md"))).toBe(true);
+  });
+
+  it("uses INIT_CWD as the default project root when none is passed", async () => {
+    const root = tempDir();
+    tmpDirs.push(root);
+    mkdirSync(root, { recursive: true });
+
+    const { exitCode } = await runInstaller([
+      "--yes",
+      "--non-interactive",
+    ], { INIT_CWD: root });
+
+    expect(exitCode).toBe(0);
+    expect(existsSync(join(root, ".floe", "memory", "scripts", "memory.ts"))).toBe(true);
+    expect(existsSync(join(root, ".agents", "skills", "context-memory", "SKILL.md"))).toBe(true);
   });
 
   it("copies skill markdown that points agents at the canonical runtime", async () => {
@@ -163,5 +222,32 @@ describe("floe-mem installer", () => {
     expect(existsSync(join(home, ".claude", "skills", "context-memory", "SKILL.md"))).toBe(true);
     expect(existsSync(join(home, ".github", "skills", "context-memory", "SKILL.md"))).toBe(false);
     expect(existsSync(join(projectRoot, ".floe", "memory"))).toBe(false);
+  });
+
+  it("postinstall bootstraps from INIT_CWD without requiring a target", async () => {
+    const root = tempDir();
+    const consumerRoot = join(root, "consumer");
+    tmpDirs.push(root);
+    mkdirSync(consumerRoot, { recursive: true });
+    const packageRoot = stageDependencyInstall(consumerRoot);
+
+    const proc = Bun.spawn(["node", join(packageRoot, "install", "postinstall.mjs")], {
+      cwd: packageRoot,
+      stdout: "pipe",
+      stderr: "pipe",
+      env: { ...process.env, INIT_CWD: consumerRoot },
+    });
+    const [, stderr, exitCode] = await Promise.all([
+      new Response(proc.stdout).text(),
+      new Response(proc.stderr).text(),
+      proc.exited,
+    ]);
+
+    expect(exitCode).toBe(0);
+    expect(stderr).toBe("");
+    expect(existsSync(join(consumerRoot, ".floe", "memory", "scripts", "memory.ts"))).toBe(true);
+    expect(existsSync(join(consumerRoot, ".agents", "skills", "context-memory", "SKILL.md"))).toBe(true);
+    expect(existsSync(join(consumerRoot, ".github", "skills", "context-memory", "SKILL.md"))).toBe(true);
+    expect(existsSync(join(consumerRoot, ".claude", "skills", "context-memory", "SKILL.md"))).toBe(true);
   });
 });

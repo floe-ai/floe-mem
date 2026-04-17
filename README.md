@@ -20,13 +20,23 @@ powershell -c "irm bun.sh/install.ps1 | iex"
 Primary install command:
 
 ```bash
-bunx github:floe-ai/floe-mem --target codex,copilot
+bunx github:floe-ai/floe-mem
+```
+
+Package-manager install:
+
+```bash
+npm install git+github:floe-ai/floe-mem
 ```
 
 This installs:
 
 - the canonical runtime into `.floe/memory/`
-- duplicated agent skill markdown into any selected targets under `.agents/`, `.github/`, and `.claude/`
+- duplicated agent skill markdown into the selected targets under `.agents/`, `.github/`, and `.claude/`
+
+When you install from an interactive terminal, the installer prompts for target
+selection. If you omit `--target` in non-interactive mode, all supported
+targets for the selected mode are installed.
 
 Useful flags:
 
@@ -38,7 +48,7 @@ bunx github:floe-ai/floe-mem --mode global --target codex --target claude --yes
 Local repo usage:
 
 ```bash
-bun run install:bootstrap --target codex --yes
+bun run install:bootstrap
 ```
 
 ## Memory Commands
@@ -72,7 +82,7 @@ bun run ~/.floe/memory/scripts/memory.ts <command> [args]
 - Canonical shipped files live under `floe/`.
 - The installed runtime lives under `.floe/memory/`.
 - Agent-facing `SKILL.md` files are duplicated into the selected dotfolders.
-- The memory database lives at `.ai/memory/memory.db` in the active project root.
+- The memory database lives at `.floe/memory/memory.db` in the active project root.
 
 ## Tests
 
